@@ -9,7 +9,7 @@ view direction). Besides the fused maps it writes the per-texel spread across vi
 RGB->X is trained on interior scenes; this is the go/no-go test for using it as 2D material prior on
 objects. Output format as unguided_trellis2.py, so evaluate_uv.py / evaluate_relit.py apply.
 
-    python baselines/rgbx.py --input pbr_dataset --pattern "*/*_rot*.glb" --out results/rgbx \
+    python -m unbake.baselines.rgbx --out output/predictions/rgbx \
         --rgbx-dir path/to/rgbx
 
 Code and weights (zheng95z/rgbx, zheng95z/rgb-to-x) are under the Adobe Research License (noncommercial
@@ -23,15 +23,14 @@ import time
 import traceback
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import numpy as np
 import torch
-import trimesh
 from PIL import Image
 
-from unguided_trellis2 import load_parts, normalization, normalize, to_u8, dilate
-from supermat import VIEWS, EXTENT, render_views, texel_samples, back_project
+from unbake.baselines.common import export_textured_glb, load_parts, normalization, normalize, pbr_material, to_u8
+from unbake.baselines.supermat import VIEWS, EXTENT, render_views, texel_samples, back_project
+from unbake.predictions import PREDICTIONS
 
 PROMPTS = {"albedo": "Albedo (diffuse basecolor)", "roughness": "Roughness", "metallic": "Metallicness"}
 
@@ -118,20 +117,10 @@ def run_asset(pipe, path, out_dir, args):
         Image.fromarray(to_u8(out["roughness"])).save(out_dir / f"tex{a}_roughness.png")
         Image.fromarray(to_u8(out["metallic"])).save(out_dir / f"tex{a}_metallic.png")
         Image.fromarray(to_u8(cover.astype(np.float32))).save(out_dir / f"tex{a}_mask.png")
-        fill = lambda img: dilate(img, known) if known.any() else img
-        mats[key] = trimesh.visual.material.PBRMaterial(
-            baseColorTexture=Image.fromarray(fill(to_u8(out["albedo"]))),
-            metallicRoughnessTexture=Image.fromarray(np.stack(
-                [np.zeros((h, w), np.uint8), fill(to_u8(out["roughness"])), fill(to_u8(out["metallic"]))], -1)),
-            metallicFactor=1.0, roughnessFactor=1.0, doubleSided=True)
+        mats[key] = pbr_material(to_u8(out["albedo"]), to_u8(out["roughness"]), to_u8(out["metallic"]), known)
         atlas_meta.append({"index": a, "size": [h, w], "parts": [parts[k]["name"] for k in idx],
                            "seen_fraction": round(float(known.sum() / max(cover.sum(), 1)), 4)})
-    glb = []
-    for p in parts:
-        mesh = p["mesh"].copy()
-        mesh.visual = trimesh.visual.TextureVisuals(uv=p["uv"], material=mats[p["tex_key"]])
-        glb.append(mesh)
-    trimesh.Scene(glb).export(out_dir / "textured.glb")
+    export_textured_glb(parts, lambda p: mats[p["tex_key"]], out_dir / "textured.glb")
     meta = {"input": str(path), "method": "rgbx", "parts": [p["name"] for p in parts], "atlases": atlas_meta,
             "views": len(VIEWS), "size": args.size, "steps": args.steps, "seed": args.seed,
             "background": args.background, "total_s": round(time.time() - t0, 1)}
@@ -141,9 +130,9 @@ def run_asset(pipe, path, out_dir, args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--input", required=True)
+    ap.add_argument("--input", default="data", help="dataset root")
     ap.add_argument("--pattern", default="*/*_rot*.glb")
-    ap.add_argument("--out", default="results/rgbx")
+    ap.add_argument("--out", default=f"{PREDICTIONS}/rgbx")
     ap.add_argument("--rgbx-dir", required=True, help="clone of https://github.com/zheng95z/rgbx")
     ap.add_argument("--only", default=None, help="comma-separated object id prefixes")
     ap.add_argument("--render-size", type=int, default=1024)

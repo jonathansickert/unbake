@@ -8,7 +8,7 @@ mesh's original UV layout (depth-tested, weighted by the cosine between normal a
 direction) and finally passed through SuperMat's UV refinement networks (base color and
 roughness/metallic) with the UV position map and mask.
 
-    python baselines/supermat.py --input pbr_dataset --pattern "*/*_rot*.glb" --out results/supermat \
+    python -m unbake.baselines.supermat --out output/predictions/supermat \
         --sm-dir path/to/SuperMat --ckpt-dir path/to/SuperMat/checkpoints
 
 Runs in an env with SuperMat's requirements (diffusers) on top of the trellis2 packages.
@@ -23,17 +23,15 @@ import time
 import traceback
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
-import trimesh
 import nvdiffrast.torch as dr
 from PIL import Image
 
-from unguided_trellis2 import load_parts, normalization, normalize, to_u8, dilate
+from unbake.baselines.common import dilate, export_textured_glb, load_parts, normalization, normalize, pbr_material, to_u8
+from unbake.predictions import PREDICTIONS
 
 # camera positions / up vectors of SuperMat's 6-view example (Z up, Blender camera convention)
 VIEWS = [((0, -1, 0), (0, 0, 1)), ((1, 0, 0), (0, 0, 1)), ((0, 1, 0), (0, 0, 1)),
@@ -287,19 +285,10 @@ def finalize(path, out_dir, args, t_total):
         rough, metal = rm[..., 1], rm[..., 2]
         Image.fromarray(rough).save(out_dir / f"tex{a}_roughness.png")
         Image.fromarray(metal).save(out_dir / f"tex{a}_metallic.png")
-        mat = trimesh.visual.material.PBRMaterial(
-            baseColorTexture=Image.fromarray(dilate(bc, cover)),
-            metallicRoughnessTexture=Image.fromarray(np.stack(
-                [np.zeros_like(rough), dilate(rough, cover), dilate(metal, cover)], -1)),
-            metallicFactor=1.0, roughnessFactor=1.0, doubleSided=True)
+        mat = pbr_material(bc, rough, metal, cover)
         for n in at["parts"]:
             by_name[n] = mat
-    glb = []
-    for p in parts:
-        mesh = p["mesh"].copy()
-        mesh.visual = trimesh.visual.TextureVisuals(uv=p["uv"], material=by_name[p["name"]])
-        glb.append(mesh)
-    trimesh.Scene(glb).export(out_dir / "textured.glb")
+    export_textured_glb(parts, lambda p: by_name[p["name"]], out_dir / "textured.glb")
     meta = {"input": str(path), "method": "supermat", "parts": [p["name"] for p in parts], "atlases": st["atlases"],
             "seed": args.seed, "refine": not args.no_refine, "time_project_s": st["time_project_s"],
             "total_s": round(t_total, 1)}
@@ -308,9 +297,9 @@ def finalize(path, out_dir, args, t_total):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--input", required=True)
-    ap.add_argument("--pattern", default="**/*_baked.glb")
-    ap.add_argument("--out", default="results/supermat")
+    ap.add_argument("--input", default="data", help="dataset root")
+    ap.add_argument("--pattern", default="*/*_rot*.glb")
+    ap.add_argument("--out", default=f"{PREDICTIONS}/supermat")
     ap.add_argument("--sm-dir", required=True, help="clone of https://github.com/hyj542682306/SuperMat")
     ap.add_argument("--ckpt-dir", required=True, help="SuperMat checkpoints (oyiya/SuperMat on Hugging Face)")
     ap.add_argument("--base-model", default="sd2-community/stable-diffusion-2-1")
