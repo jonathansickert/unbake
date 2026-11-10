@@ -6,6 +6,7 @@
 | `common.py` | Decoder block checkpointing (backprop at 1024 fits in 24 GB), voxel lookup, output in the baseline format. |
 | `latent_opt.py` | Test-time optimization of the TRELLIS.2 texture latent with the rebake loss, latent regularization, albedo anchor and optional metallic prior. |
 | `guided_sampling.py` | Rebake guidance inside the rectified-flow sampler, optionally starting from the encoded input. |
+| `delight.py` | De-lighting: base color = baked color / shading, with the lighting fitted on a prior result, low frequencies from the prior and a fallback to it in shadow. |
 | `ensemble.py` | Mean of several results per input (e.g. seeds), optionally with constant roughness / metallic. |
 | `analyze.py` | Per-input comparison with the scale-invariant albedo error. |
 | `merge_relit.py` | Merges relighting metrics of repeated evaluations. |

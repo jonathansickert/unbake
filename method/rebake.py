@@ -116,11 +116,11 @@ class Asset:
 
 
 def fit_lighting(kd_lin, c_lin, T, ridge=1e-4):
-    """Least-squares SH lighting [9, 3] (per color channel) for c = kd * (T @ L)."""
+    """Least-squares SH lighting [K, 3] (per color channel) for c = kd * (T @ L), K = number of SH coefficients."""
     L = []
     for ch in range(3):
         A = kd_lin[:, ch:ch + 1] * T
-        AtA = A.T @ A + ridge * torch.eye(9, device=A.device) * A.pow(2).sum() / len(A)
+        AtA = A.T @ A + ridge * torch.eye(T.shape[1], device=A.device) * A.pow(2).sum() / len(A)
         L.append(torch.linalg.solve(AtA, A.T @ c_lin[:, ch]))
     return torch.stack(L, 1)
 
