@@ -1,0 +1,138 @@
+{
+ "experiment": "Latent upper bound: ground-truth PBR materials encoded with the TRELLIS.2 texture encoder, decoded and baked into the UV layout (experiments/latent_ceiling.py), subset 1",
+ "summary": {
+  "basecolor_mae": 0.0196,
+  "basecolor_psnr": 31.3336,
+  "roughness_mae": 0.0238,
+  "roughness_psnr": 29.9635,
+  "metallic_mae": 0.0092,
+  "metallic_psnr": 31.8554,
+  "relit_mae": 0.0054,
+  "relit_psnr": 41.5432,
+  "relit_ssim": 0.9975,
+  "relit_lpips": 0.0021,
+  "n_inputs": 10
+ },
+ "per_input": {
+  "006d315927f4866d04cf0e748dd1319436c0fd478de6813b76c36726694f9ccf/citrus_orchard_puresky_2k_rot130": {
+   "basecolor_mae": 0.005,
+   "basecolor_psnr": 38.8704,
+   "roughness_mae": 0.0051,
+   "roughness_psnr": 38.5407,
+   "metallic_mae": 0.0036,
+   "metallic_psnr": 28.5396,
+   "relit_mae": 0.004,
+   "relit_psnr": 43.4719,
+   "relit_ssim": 0.9971,
+   "relit_lpips": 0.0025
+  },
+  "4f2ec1e79c1c1286fba9797430ac6454002ab41a06fd3f1f5675920b33d9f7f3/golden_bay_2k_rot008": {
+   "basecolor_mae": 0.0119,
+   "basecolor_psnr": 35.1884,
+   "roughness_mae": 0.014,
+   "roughness_psnr": 33.1878,
+   "metallic_mae": 0.0125,
+   "metallic_psnr": 33.95,
+   "relit_mae": 0.0058,
+   "relit_psnr": 41.9749,
+   "relit_ssim": 0.9963,
+   "relit_lpips": 0.0042
+  },
+  "696690549f101b572f257585a44826a13ee3aef7b221965f55510fa5feda57c4/monkstown_castle_2k_rot074": {
+   "basecolor_mae": 0.011,
+   "basecolor_psnr": 34.0001,
+   "roughness_mae": 0.013,
+   "roughness_psnr": 32.5518,
+   "metallic_mae": 0.0002,
+   "metallic_psnr": 40.1081,
+   "relit_mae": 0.0057,
+   "relit_psnr": 41.6324,
+   "relit_ssim": 0.9957,
+   "relit_lpips": 0.0036
+  },
+  "733b441616aed72571542e648f1f92facb0816e178c0d6bd400a195dc9aaa944/newman_lobby_2k_rot223": {
+   "basecolor_mae": 0.0027,
+   "basecolor_psnr": 36.0506,
+   "roughness_mae": 0.007,
+   "roughness_psnr": 27.8341,
+   "metallic_mae": 0.0026,
+   "metallic_psnr": 33.4741,
+   "relit_mae": 0.0027,
+   "relit_psnr": 48.0892,
+   "relit_ssim": 0.996,
+   "relit_lpips": 0.0009
+  },
+  "796f7904373bb0c75440245a2e4c0bdb499aebf1947004ba095b8f1c50325999/pergola_walkway_2k_rot312": {
+   "basecolor_mae": 0.005,
+   "basecolor_psnr": 36.3434,
+   "roughness_mae": 0.0082,
+   "roughness_psnr": 33.4227,
+   "metallic_mae": 0.0021,
+   "metallic_psnr": 37.3618,
+   "relit_mae": 0.0037,
+   "relit_psnr": 41.7466,
+   "relit_ssim": 0.9977,
+   "relit_lpips": 0.0039
+  },
+  "85e3995081716c13c1069841d33b80f9ae0ed201e72ca61eea60f210266ef997/river_alcove_2k_rot320": {
+   "basecolor_mae": 0.0074,
+   "basecolor_psnr": 33.6186,
+   "roughness_mae": 0.001,
+   "roughness_psnr": 41.7052,
+   "metallic_mae": 0.001,
+   "metallic_psnr": 37.7138,
+   "relit_mae": 0.0043,
+   "relit_psnr": 43.054,
+   "relit_ssim": 0.9965,
+   "relit_lpips": 0.0016
+  },
+  "8cf9ba0d96a413ab0c26388a4b4cb0cb4612626cc46d9edc8d83a15153e7f0ec/sundowner_deck_2k_rot075": {
+   "basecolor_mae": 0.0229,
+   "basecolor_psnr": 28.3771,
+   "roughness_mae": 0.0275,
+   "roughness_psnr": 25.3811,
+   "metallic_mae": 0.0174,
+   "metallic_psnr": 22.8717,
+   "relit_mae": 0.0039,
+   "relit_psnr": 44.5762,
+   "relit_ssim": 0.9985,
+   "relit_lpips": 0.0008
+  },
+  "9fcdd9db238dc193e97cbfb2b871fbf4f59f5f5445a5d12e7c261926155e61f6/victoria_sunset_2k_rot198": {
+   "basecolor_mae": 0.0149,
+   "basecolor_psnr": 27.1732,
+   "roughness_mae": 0.0238,
+   "roughness_psnr": 28.2487,
+   "metallic_mae": 0.0004,
+   "metallic_psnr": 38.4751,
+   "relit_mae": 0.0051,
+   "relit_psnr": 38.9587,
+   "relit_ssim": 0.9991,
+   "relit_lpips": 0.0007
+  },
+  "a7da92c5f502b57420ba2fe830ebd9428fda291171181dfdbbb33bfbe2ee3625/citrus_orchard_puresky_2k_rot032": {
+   "basecolor_mae": 0.0251,
+   "basecolor_psnr": 27.0774,
+   "roughness_mae": 0.0387,
+   "roughness_psnr": 22.854,
+   "metallic_mae": 0.0358,
+   "metallic_psnr": 21.903,
+   "relit_mae": 0.0077,
+   "relit_psnr": 37.3118,
+   "relit_ssim": 0.9991,
+   "relit_lpips": 0.0011
+  },
+  "afd3e3eb7cb61e7ecd965dce74b7cfba20fd7b3f8f51c06e96986810bacf9801/golden_bay_2k_rot123": {
+   "basecolor_mae": 0.09,
+   "basecolor_psnr": 16.6364,
+   "roughness_mae": 0.1002,
+   "roughness_psnr": 15.9087,
+   "metallic_mae": 0.0162,
+   "metallic_psnr": 24.157,
+   "relit_mae": 0.0109,
+   "relit_psnr": 34.6164,
+   "relit_ssim": 0.9985,
+   "relit_lpips": 0.0014
+  }
+ }
+}

@@ -1,0 +1,235 @@
+{
+ "experiment": "Spread of SuperMat per-view predictions vs. their error (experiments/confidence.py), subset 1",
+ "summary": {
+  "albedo": {
+   "spearman_sigma_error": 0.1205441066262164,
+   "err_confident_half": 0.14332978427410126,
+   "err_unconfident_half": 0.15284334905445576,
+   "err_all": 0.14808610267937183
+  },
+  "roughness": {
+   "spearman_sigma_error": 0.031195773674785276,
+   "err_confident_half": 0.1968922957777977,
+   "err_unconfident_half": 0.22007602751255034,
+   "err_all": 0.20848386287689208
+  },
+  "metallic": {
+   "spearman_sigma_error": 0.1216470132879359,
+   "err_confident_half": 0.2671876460313797,
+   "err_unconfident_half": 0.2854041151702404,
+   "err_all": 0.27627678513526915
+  }
+ },
+ "assets": {
+  "006d315927f4866d04cf0e748dd1319436c0fd478de6813b76c36726694f9ccf/citrus_orchard_puresky_2k_rot130": {
+   "seen_by_2_views": 0.3787666857242584,
+   "albedo": {
+    "spearman_sigma_error": 0.32124461385664077,
+    "err_confident_half": 0.2820088863372803,
+    "err_unconfident_half": 0.285525381565094,
+    "err_all": 0.28376463055610657
+   },
+   "roughness": {
+    "spearman_sigma_error": -0.1729769838982099,
+    "err_confident_half": 0.3889889121055603,
+    "err_unconfident_half": 0.3233300447463989,
+    "err_all": 0.3561594784259796
+   },
+   "metallic": {
+    "spearman_sigma_error": 0.06538013256206358,
+    "err_confident_half": 0.24301181733608246,
+    "err_unconfident_half": 0.21973907947540283,
+    "err_all": 0.23137544095516205
+   }
+  },
+  "4f2ec1e79c1c1286fba9797430ac6454002ab41a06fd3f1f5675920b33d9f7f3/golden_bay_2k_rot008": {
+   "seen_by_2_views": 0.2150000035762787,
+   "albedo": {
+    "spearman_sigma_error": 0.45883987006736165,
+    "err_confident_half": 0.03515508770942688,
+    "err_unconfident_half": 0.0616181381046772,
+    "err_all": 0.04838661476969719
+   },
+   "roughness": {
+    "spearman_sigma_error": -0.3251721643939672,
+    "err_confident_half": 0.1774863302707672,
+    "err_unconfident_half": 0.14225617051124573,
+    "err_all": 0.15987126529216766
+   },
+   "metallic": {
+    "spearman_sigma_error": 0.34783282459780784,
+    "err_confident_half": 0.08793877065181732,
+    "err_unconfident_half": 0.206416517496109,
+    "err_all": 0.14717763662338257
+   }
+  },
+  "696690549f101b572f257585a44826a13ee3aef7b221965f55510fa5feda57c4/monkstown_castle_2k_rot074": {
+   "seen_by_2_views": 0.5882999897003174,
+   "albedo": {
+    "spearman_sigma_error": -0.026845750246567403,
+    "err_confident_half": 0.13553129136562347,
+    "err_unconfident_half": 0.13351717591285706,
+    "err_all": 0.13452422618865967
+   },
+   "roughness": {
+    "spearman_sigma_error": 0.30182483764639895,
+    "err_confident_half": 0.19908230006694794,
+    "err_unconfident_half": 0.3265552222728729,
+    "err_all": 0.26281875371932983
+   },
+   "metallic": {
+    "spearman_sigma_error": 0.1626093004995852,
+    "err_confident_half": 0.3131496012210846,
+    "err_unconfident_half": 0.3375643491744995,
+    "err_all": 0.32535696029663086
+   }
+  },
+  "733b441616aed72571542e648f1f92facb0816e178c0d6bd400a195dc9aaa944/newman_lobby_2k_rot223": {
+   "seen_by_2_views": 0.640250027179718,
+   "albedo": {
+    "spearman_sigma_error": 0.10850075568253577,
+    "err_confident_half": 0.19829756021499634,
+    "err_unconfident_half": 0.20117829740047455,
+    "err_all": 0.19973787665367126
+   },
+   "roughness": {
+    "spearman_sigma_error": 0.0013993486720352342,
+    "err_confident_half": 0.1438312977552414,
+    "err_unconfident_half": 0.14350084960460663,
+    "err_all": 0.143666073679924
+   },
+   "metallic": {
+    "spearman_sigma_error": 0.23695285709193661,
+    "err_confident_half": 0.18913032114505768,
+    "err_unconfident_half": 0.2953495383262634,
+    "err_all": 0.2420477569103241
+   }
+  },
+  "796f7904373bb0c75440245a2e4c0bdb499aebf1947004ba095b8f1c50325999/pergola_walkway_2k_rot312": {
+   "seen_by_2_views": 0.5618833303451538,
+   "albedo": {
+    "spearman_sigma_error": -0.0176218933566363,
+    "err_confident_half": 0.07545703649520874,
+    "err_unconfident_half": 0.07376909255981445,
+    "err_all": 0.07461308687925339
+   },
+   "roughness": {
+    "spearman_sigma_error": 0.047596984458861014,
+    "err_confident_half": 0.16851380467414856,
+    "err_unconfident_half": 0.16990457475185394,
+    "err_all": 0.16920916736125946
+   },
+   "metallic": {
+    "spearman_sigma_error": -0.5424695513566409,
+    "err_confident_half": 0.7680965662002563,
+    "err_unconfident_half": 0.5490142107009888,
+    "err_all": 0.6585586667060852
+   }
+  },
+  "85e3995081716c13c1069841d33b80f9ae0ed201e72ca61eea60f210266ef997/river_alcove_2k_rot320": {
+   "seen_by_2_views": 0.37105000019073486,
+   "albedo": {
+    "spearman_sigma_error": 0.4730026817786989,
+    "err_confident_half": 0.06818040460348129,
+    "err_unconfident_half": 0.15097428858280182,
+    "err_all": 0.10957548022270203
+   },
+   "roughness": {
+    "spearman_sigma_error": 0.2112031091027239,
+    "err_confident_half": 0.17629730701446533,
+    "err_unconfident_half": 0.26465168595314026,
+    "err_all": 0.22047249972820282
+   },
+   "metallic": {
+    "spearman_sigma_error": -0.11150270685097556,
+    "err_confident_half": 0.5408908724784851,
+    "err_unconfident_half": 0.5186889171600342,
+    "err_all": 0.5297903418540955
+   }
+  },
+  "8cf9ba0d96a413ab0c26388a4b4cb0cb4612626cc46d9edc8d83a15153e7f0ec/sundowner_deck_2k_rot075": {
+   "seen_by_2_views": 0.35030001401901245,
+   "albedo": {
+    "spearman_sigma_error": 0.05646120814883736,
+    "err_confident_half": 0.14593413472175598,
+    "err_unconfident_half": 0.14679323136806488,
+    "err_all": 0.14636366069316864
+   },
+   "roughness": {
+    "spearman_sigma_error": 0.13867811208693484,
+    "err_confident_half": 0.19978991150856018,
+    "err_unconfident_half": 0.2662231922149658,
+    "err_all": 0.2330065667629242
+   },
+   "metallic": {
+    "spearman_sigma_error": 0.23550932291396956,
+    "err_confident_half": 0.07850673049688339,
+    "err_unconfident_half": 0.07760996371507645,
+    "err_all": 0.07805834710597992
+   }
+  },
+  "9fcdd9db238dc193e97cbfb2b871fbf4f59f5f5445a5d12e7c261926155e61f6/victoria_sunset_2k_rot198": {
+   "seen_by_2_views": 0.7556999921798706,
+   "albedo": {
+    "spearman_sigma_error": 0.09949365245432219,
+    "err_confident_half": 0.09442266076803207,
+    "err_unconfident_half": 0.10711053013801575,
+    "err_all": 0.10076659917831421
+   },
+   "roughness": {
+    "spearman_sigma_error": -0.11537168994807036,
+    "err_confident_half": 0.16082198917865753,
+    "err_unconfident_half": 0.14749714732170105,
+    "err_all": 0.1541595607995987
+   },
+   "metallic": {
+    "spearman_sigma_error": 0.4808008700656645,
+    "err_confident_half": 0.04775813966989517,
+    "err_unconfident_half": 0.10525910556316376,
+    "err_all": 0.07650862634181976
+   }
+  },
+  "a7da92c5f502b57420ba2fe830ebd9428fda291171181dfdbbb33bfbe2ee3625/citrus_orchard_puresky_2k_rot032": {
+   "seen_by_2_views": 0.8131333589553833,
+   "albedo": {
+    "spearman_sigma_error": -0.2842613778602337,
+    "err_confident_half": 0.2335169017314911,
+    "err_unconfident_half": 0.1920255571603775,
+    "err_all": 0.2127712517976761
+   },
+   "roughness": {
+    "spearman_sigma_error": 0.08103025718936113,
+    "err_confident_half": 0.12554222345352173,
+    "err_unconfident_half": 0.14282187819480896,
+    "err_all": 0.13418205082416534
+   },
+   "metallic": {
+    "spearman_sigma_error": 0.025737322552322073,
+    "err_confident_half": 0.21708600223064423,
+    "err_unconfident_half": 0.2427329123020172,
+    "err_all": 0.2299094796180725
+   }
+  },
+  "afd3e3eb7cb61e7ecd965dce74b7cfba20fd7b3f8f51c06e96986810bacf9801/golden_bay_2k_rot123": {
+   "seen_by_2_views": 0.3865833282470703,
+   "albedo": {
+    "spearman_sigma_error": 0.01662730573720452,
+    "err_confident_half": 0.16479387879371643,
+    "err_unconfident_half": 0.17592179775238037,
+    "err_all": 0.1703575998544693
+   },
+   "roughness": {
+    "spearman_sigma_error": 0.14374592583178505,
+    "err_confident_half": 0.2285688817501068,
+    "err_unconfident_half": 0.2740195095539093,
+    "err_all": 0.25129321217536926
+   },
+   "metallic": {
+    "spearman_sigma_error": 0.315619760803626,
+    "err_confident_half": 0.1863076388835907,
+    "err_unconfident_half": 0.3016665577888489,
+    "err_all": 0.24398459494113922
+   }
+  }
+ }
+}

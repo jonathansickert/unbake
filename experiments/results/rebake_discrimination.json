@@ -1,0 +1,873 @@
+{
+ "experiment": "Rebake MAE with fitted SH lighting of candidate material sets vs. their albedo error (experiments/rebake_discrimination.py), subset 1; kd = base color (used by the method) and kd = base color x (1 - metallic)",
+ "kd_basecolor": {
+  "summary": {
+   "Material Anything": {
+    "rebake_mae": 0.08518202230334282,
+    "albedo_mae": 0.2372858703136444,
+    "metallic_mae": 0.37622506320476534,
+    "n": 10
+   },
+   "SuperMat": {
+    "rebake_mae": 0.06619339808821678,
+    "albedo_mae": 0.1563265196979046,
+    "metallic_mae": 0.2631503209471703,
+    "n": 10
+   },
+   "constant gray": {
+    "rebake_mae": 0.09681125842034817,
+    "albedo_mae": 0.27202047407627106,
+    "metallic_mae": 0.2404585425858386,
+    "n": 10
+   },
+   "ground truth": {
+    "rebake_mae": 0.03868793472647667,
+    "albedo_mae": 0.0,
+    "metallic_mae": 0.0,
+    "n": 10,
+    "rebake_mae_no_visibility": 0.07719592936336994
+   },
+   "input as albedo": {
+    "rebake_mae": 0.024002255219966174,
+    "albedo_mae": 0.16283925324678422,
+    "metallic_mae": 0.2404585425858386,
+    "n": 10
+   },
+   "unguided TRELLIS.2": {
+    "rebake_mae": 0.0740937564522028,
+    "albedo_mae": 0.11497357711195946,
+    "metallic_mae": 0.45350621491670606,
+    "n": 10
+   },
+   "_ground_truth_lowest_fraction": 0.2,
+   "_spearman_rebake_vs_albedo_error": 0.4685714285714286
+  },
+  "assets": {
+   "006d315927f4866d04cf0e748dd1319436c0fd478de6813b76c36726694f9ccf/citrus_orchard_puresky_2k_rot130": {
+    "ground truth": {
+     "rebake_mae": 0.09821262210607529,
+     "rebake_psnr": 14.673628756758365,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.15111100673675537
+    },
+    "input as albedo": {
+     "rebake_mae": 0.054086167365312576,
+     "rebake_psnr": 15.821764876766453,
+     "albedo_mae": 0.27212101221084595,
+     "metallic_mae": 0.2262333333492279
+    },
+    "constant gray": {
+     "rebake_mae": 0.08561870455741882,
+     "rebake_psnr": 15.008884324122567,
+     "albedo_mae": 0.17690593004226685,
+     "metallic_mae": 0.2262333333492279
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.08635443449020386,
+     "rebake_psnr": 15.046118319606874,
+     "albedo_mae": 0.05051982402801514,
+     "metallic_mae": 0.15897570550441742
+    },
+    "SuperMat": {
+     "rebake_mae": 0.08653242141008377,
+     "rebake_psnr": 15.305792072253979,
+     "albedo_mae": 0.24396981298923492,
+     "metallic_mae": 0.27581581473350525
+    },
+    "Material Anything": {
+     "rebake_mae": 0.0919916033744812,
+     "rebake_psnr": 15.119038413073945,
+     "albedo_mae": 0.23994623124599457,
+     "metallic_mae": 0.22226303815841675
+    }
+   },
+   "4f2ec1e79c1c1286fba9797430ac6454002ab41a06fd3f1f5675920b33d9f7f3/golden_bay_2k_rot008": {
+    "ground truth": {
+     "rebake_mae": 0.02919566072523594,
+     "rebake_psnr": 27.46836693420144,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.05241651460528374
+    },
+    "input as albedo": {
+     "rebake_mae": 0.02322918362915516,
+     "rebake_psnr": 28.279100131159304,
+     "albedo_mae": 0.10844360291957855,
+     "metallic_mae": 0.21823859214782715
+    },
+    "constant gray": {
+     "rebake_mae": 0.0807470977306366,
+     "rebake_psnr": 19.209389275798582,
+     "albedo_mae": 0.19968199729919434,
+     "metallic_mae": 0.21823859214782715
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.05009760707616806,
+     "rebake_psnr": 23.605602546225974,
+     "albedo_mae": 0.08568692952394485,
+     "metallic_mae": 0.2182384580373764
+    },
+    "SuperMat": {
+     "rebake_mae": 0.043861761689186096,
+     "rebake_psnr": 24.151396664204874,
+     "albedo_mae": 0.09789867699146271,
+     "metallic_mae": 0.15280680358409882
+    },
+    "Material Anything": {
+     "rebake_mae": 0.05747634172439575,
+     "rebake_psnr": 22.30886168959893,
+     "albedo_mae": 0.13887372612953186,
+     "metallic_mae": 0.2454787641763687
+    }
+   },
+   "696690549f101b572f257585a44826a13ee3aef7b221965f55510fa5feda57c4/monkstown_castle_2k_rot074": {
+    "ground truth": {
+     "rebake_mae": 0.02781035006046295,
+     "rebake_psnr": 26.876382816083854,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.06012986600399017
+    },
+    "input as albedo": {
+     "rebake_mae": 0.03893519565463066,
+     "rebake_psnr": 24.273420854933217,
+     "albedo_mae": 0.11436102539300919,
+     "metallic_mae": 0.037425294518470764
+    },
+    "constant gray": {
+     "rebake_mae": 0.11908086389303207,
+     "rebake_psnr": 16.157275604357658,
+     "albedo_mae": 0.27375856041908264,
+     "metallic_mae": 0.037425294518470764
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.11071599274873734,
+     "rebake_psnr": 16.80978975233122,
+     "albedo_mae": 0.09980408102273941,
+     "metallic_mae": 0.113003671169281
+    },
+    "SuperMat": {
+     "rebake_mae": 0.08572924137115479,
+     "rebake_psnr": 18.438018329960133,
+     "albedo_mae": 0.12343719601631165,
+     "metallic_mae": 0.2159009426832199
+    },
+    "Material Anything": {
+     "rebake_mae": 0.11285414546728134,
+     "rebake_psnr": 16.219709749085848,
+     "albedo_mae": 0.3492520749568939,
+     "metallic_mae": 0.3356330692768097
+    }
+   },
+   "733b441616aed72571542e648f1f92facb0816e178c0d6bd400a195dc9aaa944/newman_lobby_2k_rot223": {
+    "ground truth": {
+     "rebake_mae": 0.03963274136185646,
+     "rebake_psnr": 24.80001110766308,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.08063064515590668
+    },
+    "input as albedo": {
+     "rebake_mae": 0.019637420773506165,
+     "rebake_psnr": 28.707974694780305,
+     "albedo_mae": 0.15821221470832825,
+     "metallic_mae": 0.19195511937141418
+    },
+    "constant gray": {
+     "rebake_mae": 0.05191640183329582,
+     "rebake_psnr": 23.146000962114876,
+     "albedo_mae": 0.2216811180114746,
+     "metallic_mae": 0.19195511937141418
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.04992447793483734,
+     "rebake_psnr": 23.03143267612246,
+     "albedo_mae": 0.1499253660440445,
+     "metallic_mae": 0.2333635538816452
+    },
+    "SuperMat": {
+     "rebake_mae": 0.03392681106925011,
+     "rebake_psnr": 26.459562666768743,
+     "albedo_mae": 0.19810576736927032,
+     "metallic_mae": 0.24080093204975128
+    },
+    "Material Anything": {
+     "rebake_mae": 0.08191416412591934,
+     "rebake_psnr": 19.8693844317746,
+     "albedo_mae": 0.18188363313674927,
+     "metallic_mae": 0.1953284591436386
+    }
+   },
+   "796f7904373bb0c75440245a2e4c0bdb499aebf1947004ba095b8f1c50325999/pergola_walkway_2k_rot312": {
+    "ground truth": {
+     "rebake_mae": 0.0236736461520195,
+     "rebake_psnr": 27.210719732114754,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.06841825693845749
+    },
+    "input as albedo": {
+     "rebake_mae": 0.01108495518565178,
+     "rebake_psnr": 29.227242876153827,
+     "albedo_mae": 0.10684442520141602,
+     "metallic_mae": 0.716481626033783
+    },
+    "constant gray": {
+     "rebake_mae": 0.07787065207958221,
+     "rebake_psnr": 17.538320849356037,
+     "albedo_mae": 0.40791210532188416,
+     "metallic_mae": 0.716481626033783
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.058175016194581985,
+     "rebake_psnr": 18.62792896601526,
+     "albedo_mae": 0.12035861611366272,
+     "metallic_mae": 0.5570435523986816
+    },
+    "SuperMat": {
+     "rebake_mae": 0.0350847989320755,
+     "rebake_psnr": 23.141409686346663,
+     "albedo_mae": 0.07816313952207565,
+     "metallic_mae": 0.6469674706459045
+    },
+    "Material Anything": {
+     "rebake_mae": 0.06715960800647736,
+     "rebake_psnr": 18.517135051309566,
+     "albedo_mae": 0.2150731086730957,
+     "metallic_mae": 0.228276789188385
+    }
+   },
+   "85e3995081716c13c1069841d33b80f9ae0ed201e72ca61eea60f210266ef997/river_alcove_2k_rot320": {
+    "ground truth": {
+     "rebake_mae": 0.0875745639204979,
+     "rebake_psnr": 16.449374422004578,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.12701046466827393
+    },
+    "input as albedo": {
+     "rebake_mae": 0.029107211157679558,
+     "rebake_psnr": 24.430152218420595,
+     "albedo_mae": 0.1948297768831253,
+     "metallic_mae": 0.29048359394073486
+    },
+    "constant gray": {
+     "rebake_mae": 0.11058635264635086,
+     "rebake_psnr": 15.161887098428952,
+     "albedo_mae": 0.2676580846309662,
+     "metallic_mae": 0.29048359394073486
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.0958104059100151,
+     "rebake_psnr": 15.958624680339062,
+     "albedo_mae": 0.13576585054397583,
+     "metallic_mae": 0.3426760137081146
+    },
+    "SuperMat": {
+     "rebake_mae": 0.08395640552043915,
+     "rebake_psnr": 17.165094502378423,
+     "albedo_mae": 0.13110989332199097,
+     "metallic_mae": 0.41408461332321167
+    },
+    "Material Anything": {
+     "rebake_mae": 0.0954701378941536,
+     "rebake_psnr": 16.081055691626997,
+     "albedo_mae": 0.21032680571079254,
+     "metallic_mae": 0.7113587260246277
+    }
+   },
+   "8cf9ba0d96a413ab0c26388a4b4cb0cb4612626cc46d9edc8d83a15153e7f0ec/sundowner_deck_2k_rot075": {
+    "ground truth": {
+     "rebake_mae": 0.02243347465991974,
+     "rebake_psnr": 27.082044565809174,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.09739814698696136
+    },
+    "input as albedo": {
+     "rebake_mae": 0.01977071724832058,
+     "rebake_psnr": 28.100737949320354,
+     "albedo_mae": 0.1435215026140213,
+     "metallic_mae": 0.023829413577914238
+    },
+    "constant gray": {
+     "rebake_mae": 0.07008793205022812,
+     "rebake_psnr": 18.55118286351916,
+     "albedo_mae": 0.3515784740447998,
+     "metallic_mae": 0.023829413577914238
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.06971295922994614,
+     "rebake_psnr": 18.499136020490322,
+     "albedo_mae": 0.11524830013513565,
+     "metallic_mae": 0.976166844367981
+    },
+    "SuperMat": {
+     "rebake_mae": 0.05908208712935448,
+     "rebake_psnr": 19.69663234531049,
+     "albedo_mae": 0.14326685667037964,
+     "metallic_mae": 0.043857455253601074
+    },
+    "Material Anything": {
+     "rebake_mae": 0.06392233073711395,
+     "rebake_psnr": 19.134464077053636,
+     "albedo_mae": 0.33615607023239136,
+     "metallic_mae": 0.36317428946495056
+    }
+   },
+   "9fcdd9db238dc193e97cbfb2b871fbf4f59f5f5445a5d12e7c261926155e61f6/victoria_sunset_2k_rot198": {
+    "ground truth": {
+     "rebake_mae": 0.03330468386411667,
+     "rebake_psnr": 25.025834696448975,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.08018820732831955
+    },
+    "input as albedo": {
+     "rebake_mae": 0.021766217425465584,
+     "rebake_psnr": 28.143769764884038,
+     "albedo_mae": 0.3021843731403351,
+     "metallic_mae": 0.0018976471619680524
+    },
+    "constant gray": {
+     "rebake_mae": 0.10591074079275131,
+     "rebake_psnr": 16.413084207925998,
+     "albedo_mae": 0.200351744890213,
+     "metallic_mae": 0.0018976471619680524
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.043545596301555634,
+     "rebake_psnr": 23.25203837930816,
+     "albedo_mae": 0.08856052905321121,
+     "metallic_mae": 0.9962736964225769
+    },
+    "SuperMat": {
+     "rebake_mae": 0.04126551002264023,
+     "rebake_psnr": 23.812264713947798,
+     "albedo_mae": 0.14069540798664093,
+     "metallic_mae": 0.11314190924167633
+    },
+    "Material Anything": {
+     "rebake_mae": 0.06218815594911575,
+     "rebake_psnr": 20.89221410134745,
+     "albedo_mae": 0.12761688232421875,
+     "metallic_mae": 0.2221074104309082
+    }
+   },
+   "a7da92c5f502b57420ba2fe830ebd9428fda291171181dfdbbb33bfbe2ee3625/citrus_orchard_puresky_2k_rot032": {
+    "ground truth": {
+     "rebake_mae": 0.008722076192498207,
+     "rebake_psnr": 36.97025375713247,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.01951056346297264
+    },
+    "input as albedo": {
+     "rebake_mae": 0.011574406176805496,
+     "rebake_psnr": 34.56834511412933,
+     "albedo_mae": 0.05694276839494705,
+     "metallic_mae": 0.6746187806129456
+    },
+    "constant gray": {
+     "rebake_mae": 0.13590554893016815,
+     "rebake_psnr": 14.95780819762443,
+     "albedo_mae": 0.2905973196029663,
+     "metallic_mae": 0.6746187806129456
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.09042029827833176,
+     "rebake_psnr": 16.902527748085113,
+     "albedo_mae": 0.12396606057882309,
+     "metallic_mae": 0.3161695897579193
+    },
+    "SuperMat": {
+     "rebake_mae": 0.10773777961730957,
+     "rebake_psnr": 16.95126543286606,
+     "albedo_mae": 0.22872404754161835,
+     "metallic_mae": 0.30773770809173584
+    },
+    "Material Anything": {
+     "rebake_mae": 0.10353551805019379,
+     "rebake_psnr": 16.582931581128378,
+     "albedo_mae": 0.26669251918792725,
+     "metallic_mae": 0.363290399312973
+    }
+   },
+   "afd3e3eb7cb61e7ecd965dce74b7cfba20fd7b3f8f51c06e96986810bacf9801/golden_bay_2k_rot123": {
+    "ground truth": {
+     "rebake_mae": 0.016319528222084045,
+     "rebake_psnr": 29.24891851852965,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.03514562174677849
+    },
+    "input as albedo": {
+     "rebake_mae": 0.010831077583134174,
+     "rebake_psnr": 33.815766964178195,
+     "albedo_mae": 0.1709318310022354,
+     "metallic_mae": 0.02342202514410019
+    },
+    "constant gray": {
+     "rebake_mae": 0.1303882896900177,
+     "rebake_psnr": 15.476748500159696,
+     "albedo_mae": 0.33007940649986267,
+     "metallic_mae": 0.02342202514410019
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.08618077635765076,
+     "rebake_psnr": 16.67852802500764,
+     "albedo_mae": 0.17990021407604218,
+     "metallic_mae": 0.6231510639190674
+    },
+    "SuperMat": {
+     "rebake_mae": 0.08475716412067413,
+     "rebake_psnr": 18.15177808347262,
+     "albedo_mae": 0.17789439857006073,
+     "metallic_mae": 0.22038955986499786
+    },
+    "Material Anything": {
+     "rebake_mae": 0.11530821770429611,
+     "rebake_psnr": 16.045726452651394,
+     "albedo_mae": 0.3070376515388489,
+     "metallic_mae": 0.875339686870575
+    }
+   }
+  }
+ },
+ "kd_diffuse": {
+  "summary": {
+   "Material Anything": {
+    "rebake_mae": 0.08858836814761162,
+    "albedo_mae": 0.2372858703136444,
+    "metallic_mae": 0.37622506320476534,
+    "n": 10
+   },
+   "SuperMat": {
+    "rebake_mae": 0.06985662057995796,
+    "albedo_mae": 0.1563265196979046,
+    "metallic_mae": 0.2631503209471703,
+    "n": 10
+   },
+   "constant gray": {
+    "rebake_mae": 0.09681125842034817,
+    "albedo_mae": 0.27202047407627106,
+    "metallic_mae": 0.2404585425858386,
+    "n": 10
+   },
+   "ground truth": {
+    "rebake_mae": 0.06572984028607606,
+    "albedo_mae": 0.0,
+    "metallic_mae": 0.0,
+    "n": 10,
+    "rebake_mae_no_visibility": 0.10030395090579987
+   },
+   "input as albedo": {
+    "rebake_mae": 0.024002255219966174,
+    "albedo_mae": 0.16283925324678422,
+    "metallic_mae": 0.2404585425858386,
+    "n": 10
+   },
+   "unguided TRELLIS.2": {
+    "rebake_mae": 0.1088992677628994,
+    "albedo_mae": 0.11497357711195946,
+    "metallic_mae": 0.45350621491670606,
+    "n": 10
+   },
+   "_ground_truth_lowest_fraction": 0.1,
+   "_spearman_rebake_vs_albedo_error": 0.16
+  },
+  "assets": {
+   "006d315927f4866d04cf0e748dd1319436c0fd478de6813b76c36726694f9ccf/citrus_orchard_puresky_2k_rot130": {
+    "ground truth": {
+     "rebake_mae": 0.0975450873374939,
+     "rebake_psnr": 14.398435925182635,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.15061375498771667
+    },
+    "input as albedo": {
+     "rebake_mae": 0.054086167365312576,
+     "rebake_psnr": 15.821764876766453,
+     "albedo_mae": 0.27212101221084595,
+     "metallic_mae": 0.2262333333492279
+    },
+    "constant gray": {
+     "rebake_mae": 0.08561870455741882,
+     "rebake_psnr": 15.008884324122567,
+     "albedo_mae": 0.17690593004226685,
+     "metallic_mae": 0.2262333333492279
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.08619147539138794,
+     "rebake_psnr": 15.054924293447026,
+     "albedo_mae": 0.05051982402801514,
+     "metallic_mae": 0.15897570550441742
+    },
+    "SuperMat": {
+     "rebake_mae": 0.08612772077322006,
+     "rebake_psnr": 15.279133621185983,
+     "albedo_mae": 0.24396981298923492,
+     "metallic_mae": 0.27581581473350525
+    },
+    "Material Anything": {
+     "rebake_mae": 0.09141855686903,
+     "rebake_psnr": 15.128197040938948,
+     "albedo_mae": 0.23994623124599457,
+     "metallic_mae": 0.22226303815841675
+    }
+   },
+   "4f2ec1e79c1c1286fba9797430ac6454002ab41a06fd3f1f5675920b33d9f7f3/golden_bay_2k_rot008": {
+    "ground truth": {
+     "rebake_mae": 0.04983772337436676,
+     "rebake_psnr": 23.35509483667966,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.06095682084560394
+    },
+    "input as albedo": {
+     "rebake_mae": 0.02322918362915516,
+     "rebake_psnr": 28.279100131159304,
+     "albedo_mae": 0.10844360291957855,
+     "metallic_mae": 0.21823859214782715
+    },
+    "constant gray": {
+     "rebake_mae": 0.0807470977306366,
+     "rebake_psnr": 19.209389275798582,
+     "albedo_mae": 0.19968199729919434,
+     "metallic_mae": 0.21823859214782715
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.050097618252038956,
+     "rebake_psnr": 23.605600690667693,
+     "albedo_mae": 0.08568692952394485,
+     "metallic_mae": 0.2182384580373764
+    },
+    "SuperMat": {
+     "rebake_mae": 0.04726086184382439,
+     "rebake_psnr": 23.407874217885322,
+     "albedo_mae": 0.09789867699146271,
+     "metallic_mae": 0.15280680358409882
+    },
+    "Material Anything": {
+     "rebake_mae": 0.07350670546293259,
+     "rebake_psnr": 19.677606543351015,
+     "albedo_mae": 0.13887372612953186,
+     "metallic_mae": 0.2454787641763687
+    }
+   },
+   "696690549f101b572f257585a44826a13ee3aef7b221965f55510fa5feda57c4/monkstown_castle_2k_rot074": {
+    "ground truth": {
+     "rebake_mae": 0.03773282840847969,
+     "rebake_psnr": 21.7770345464995,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.06810373067855835
+    },
+    "input as albedo": {
+     "rebake_mae": 0.03893519565463066,
+     "rebake_psnr": 24.273420854933217,
+     "albedo_mae": 0.11436102539300919,
+     "metallic_mae": 0.037425294518470764
+    },
+    "constant gray": {
+     "rebake_mae": 0.11908086389303207,
+     "rebake_psnr": 16.157275604357658,
+     "albedo_mae": 0.27375856041908264,
+     "metallic_mae": 0.037425294518470764
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.09815434366464615,
+     "rebake_psnr": 17.59398772233295,
+     "albedo_mae": 0.09980408102273941,
+     "metallic_mae": 0.113003671169281
+    },
+    "SuperMat": {
+     "rebake_mae": 0.08240066468715668,
+     "rebake_psnr": 18.45539601567658,
+     "albedo_mae": 0.12343719601631165,
+     "metallic_mae": 0.2159009426832199
+    },
+    "Material Anything": {
+     "rebake_mae": 0.10619655251502991,
+     "rebake_psnr": 16.578951660131224,
+     "albedo_mae": 0.3492520749568939,
+     "metallic_mae": 0.3356330692768097
+    }
+   },
+   "733b441616aed72571542e648f1f92facb0816e178c0d6bd400a195dc9aaa944/newman_lobby_2k_rot223": {
+    "ground truth": {
+     "rebake_mae": 0.068605437874794,
+     "rebake_psnr": 21.073315989573178,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.10319466143846512
+    },
+    "input as albedo": {
+     "rebake_mae": 0.019637420773506165,
+     "rebake_psnr": 28.707974694780305,
+     "albedo_mae": 0.15821221470832825,
+     "metallic_mae": 0.19195511937141418
+    },
+    "constant gray": {
+     "rebake_mae": 0.05191640183329582,
+     "rebake_psnr": 23.146000962114876,
+     "albedo_mae": 0.2216811180114746,
+     "metallic_mae": 0.19195511937141418
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.04899895191192627,
+     "rebake_psnr": 23.151397157523533,
+     "albedo_mae": 0.1499253660440445,
+     "metallic_mae": 0.2333635538816452
+    },
+    "SuperMat": {
+     "rebake_mae": 0.0354502834379673,
+     "rebake_psnr": 26.1213986946492,
+     "albedo_mae": 0.19810576736927032,
+     "metallic_mae": 0.24080093204975128
+    },
+    "Material Anything": {
+     "rebake_mae": 0.08158215880393982,
+     "rebake_psnr": 19.903943669114394,
+     "albedo_mae": 0.18188363313674927,
+     "metallic_mae": 0.1953284591436386
+    }
+   },
+   "796f7904373bb0c75440245a2e4c0bdb499aebf1947004ba095b8f1c50325999/pergola_walkway_2k_rot312": {
+    "ground truth": {
+     "rebake_mae": 0.09352842718362808,
+     "rebake_psnr": 17.899583364212393,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.12351410835981369
+    },
+    "input as albedo": {
+     "rebake_mae": 0.01108495518565178,
+     "rebake_psnr": 29.227242876153827,
+     "albedo_mae": 0.10684442520141602,
+     "metallic_mae": 0.716481626033783
+    },
+    "constant gray": {
+     "rebake_mae": 0.07787065207958221,
+     "rebake_psnr": 17.538320849356037,
+     "albedo_mae": 0.40791210532188416,
+     "metallic_mae": 0.716481626033783
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.05809294059872627,
+     "rebake_psnr": 18.659619734570455,
+     "albedo_mae": 0.12035861611366272,
+     "metallic_mae": 0.5570435523986816
+    },
+    "SuperMat": {
+     "rebake_mae": 0.06594771146774292,
+     "rebake_psnr": 19.7887292231194,
+     "albedo_mae": 0.07816313952207565,
+     "metallic_mae": 0.6469674706459045
+    },
+    "Material Anything": {
+     "rebake_mae": 0.07914622128009796,
+     "rebake_psnr": 17.96472390377584,
+     "albedo_mae": 0.2150731086730957,
+     "metallic_mae": 0.228276789188385
+    }
+   },
+   "85e3995081716c13c1069841d33b80f9ae0ed201e72ca61eea60f210266ef997/river_alcove_2k_rot320": {
+    "ground truth": {
+     "rebake_mae": 0.09783116728067398,
+     "rebake_psnr": 15.419741582520203,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.13247622549533844
+    },
+    "input as albedo": {
+     "rebake_mae": 0.029107211157679558,
+     "rebake_psnr": 24.430152218420595,
+     "albedo_mae": 0.1948297768831253,
+     "metallic_mae": 0.29048359394073486
+    },
+    "constant gray": {
+     "rebake_mae": 0.11058635264635086,
+     "rebake_psnr": 15.161887098428952,
+     "albedo_mae": 0.2676580846309662,
+     "metallic_mae": 0.29048359394073486
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.09767814725637436,
+     "rebake_psnr": 15.73317754952,
+     "albedo_mae": 0.13576585054397583,
+     "metallic_mae": 0.3426760137081146
+    },
+    "SuperMat": {
+     "rebake_mae": 0.08500047773122787,
+     "rebake_psnr": 17.2482117210335,
+     "albedo_mae": 0.13110989332199097,
+     "metallic_mae": 0.41408461332321167
+    },
+    "Material Anything": {
+     "rebake_mae": 0.11079754680395126,
+     "rebake_psnr": 13.442102018038224,
+     "albedo_mae": 0.21032680571079254,
+     "metallic_mae": 0.7113587260246277
+    }
+   },
+   "8cf9ba0d96a413ab0c26388a4b4cb0cb4612626cc46d9edc8d83a15153e7f0ec/sundowner_deck_2k_rot075": {
+    "ground truth": {
+     "rebake_mae": 0.03500163555145264,
+     "rebake_psnr": 23.27764435814121,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.11440591514110565
+    },
+    "input as albedo": {
+     "rebake_mae": 0.01977071724832058,
+     "rebake_psnr": 28.100737949320354,
+     "albedo_mae": 0.1435215026140213,
+     "metallic_mae": 0.023829413577914238
+    },
+    "constant gray": {
+     "rebake_mae": 0.07008793205022812,
+     "rebake_psnr": 18.55118286351916,
+     "albedo_mae": 0.3515784740447998,
+     "metallic_mae": 0.023829413577914238
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.1527204066514969,
+     "rebake_psnr": 11.497108438067134,
+     "albedo_mae": 0.11524830013513565,
+     "metallic_mae": 0.976166844367981
+    },
+    "SuperMat": {
+     "rebake_mae": 0.05895369127392769,
+     "rebake_psnr": 19.703209670092214,
+     "albedo_mae": 0.14326685667037964,
+     "metallic_mae": 0.043857455253601074
+    },
+    "Material Anything": {
+     "rebake_mae": 0.0745161771774292,
+     "rebake_psnr": 17.786894877249363,
+     "albedo_mae": 0.33615607023239136,
+     "metallic_mae": 0.36317428946495056
+    }
+   },
+   "9fcdd9db238dc193e97cbfb2b871fbf4f59f5f5445a5d12e7c261926155e61f6/victoria_sunset_2k_rot198": {
+    "ground truth": {
+     "rebake_mae": 0.03357560187578201,
+     "rebake_psnr": 24.921377439427896,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.08026620745658875
+    },
+    "input as albedo": {
+     "rebake_mae": 0.021766217425465584,
+     "rebake_psnr": 28.143769764884038,
+     "albedo_mae": 0.3021843731403351,
+     "metallic_mae": 0.0018976471619680524
+    },
+    "constant gray": {
+     "rebake_mae": 0.10591074079275131,
+     "rebake_psnr": 16.413084207925998,
+     "albedo_mae": 0.200351744890213,
+     "metallic_mae": 0.0018976471619680524
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.15285038948059082,
+     "rebake_psnr": 12.556485677289178,
+     "albedo_mae": 0.08856052905321121,
+     "metallic_mae": 0.9962736964225769
+    },
+    "SuperMat": {
+     "rebake_mae": 0.04380771890282631,
+     "rebake_psnr": 23.268460072308088,
+     "albedo_mae": 0.14069540798664093,
+     "metallic_mae": 0.11314190924167633
+    },
+    "Material Anything": {
+     "rebake_mae": 0.049941763281822205,
+     "rebake_psnr": 22.868663280692147,
+     "albedo_mae": 0.12761688232421875,
+     "metallic_mae": 0.2221074104309082
+    }
+   },
+   "a7da92c5f502b57420ba2fe830ebd9428fda291171181dfdbbb33bfbe2ee3625/citrus_orchard_puresky_2k_rot032": {
+    "ground truth": {
+     "rebake_mae": 0.12663967907428741,
+     "rebake_psnr": 14.26718977166336,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.13357457518577576
+    },
+    "input as albedo": {
+     "rebake_mae": 0.011574406176805496,
+     "rebake_psnr": 34.56834511412933,
+     "albedo_mae": 0.05694276839494705,
+     "metallic_mae": 0.6746187806129456
+    },
+    "constant gray": {
+     "rebake_mae": 0.13590554893016815,
+     "rebake_psnr": 14.95780819762443,
+     "albedo_mae": 0.2905973196029663,
+     "metallic_mae": 0.6746187806129456
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.2129647433757782,
+     "rebake_psnr": 11.085315830672878,
+     "albedo_mae": 0.12396606057882309,
+     "metallic_mae": 0.3161695897579193
+    },
+    "SuperMat": {
+     "rebake_mae": 0.10730834305286407,
+     "rebake_psnr": 16.70225738848239,
+     "albedo_mae": 0.22872404754161835,
+     "metallic_mae": 0.30773770809173584
+    },
+    "Material Anything": {
+     "rebake_mae": 0.10363854467868805,
+     "rebake_psnr": 16.425112832537238,
+     "albedo_mae": 0.26669251918792725,
+     "metallic_mae": 0.363290399312973
+    }
+   },
+   "afd3e3eb7cb61e7ecd965dce74b7cfba20fd7b3f8f51c06e96986810bacf9801/golden_bay_2k_rot123": {
+    "ground truth": {
+     "rebake_mae": 0.017000814899802208,
+     "rebake_psnr": 28.995026190764502,
+     "albedo_mae": 0.0,
+     "metallic_mae": 0.0,
+     "rebake_mae_no_visibility": 0.03593350946903229
+    },
+    "input as albedo": {
+     "rebake_mae": 0.010831077583134174,
+     "rebake_psnr": 33.815766964178195,
+     "albedo_mae": 0.1709318310022354,
+     "metallic_mae": 0.02342202514410019
+    },
+    "constant gray": {
+     "rebake_mae": 0.1303882896900177,
+     "rebake_psnr": 15.476748500159696,
+     "albedo_mae": 0.33007940649986267,
+     "metallic_mae": 0.02342202514410019
+    },
+    "unguided TRELLIS.2": {
+     "rebake_mae": 0.13124366104602814,
+     "rebake_psnr": 12.982685998874048,
+     "albedo_mae": 0.17990021407604218,
+     "metallic_mae": 0.6231510639190674
+    },
+    "SuperMat": {
+     "rebake_mae": 0.08630873262882233,
+     "rebake_psnr": 18.03252530086844,
+     "albedo_mae": 0.17789439857006073,
+     "metallic_mae": 0.22038955986499786
+    },
+    "Material Anything": {
+     "rebake_mae": 0.11513945460319519,
+     "rebake_psnr": 15.553481798534348,
+     "albedo_mae": 0.3070376515388489,
+     "metallic_mae": 0.875339686870575
+    }
+   }
+  }
+ }
+}

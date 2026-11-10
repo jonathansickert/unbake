@@ -1,0 +1,131 @@
+{
+ "experiment": "Rebake MAE (sRGB) of the ground-truth materials (kd = base color x (1 - metallic)) with SH lighting of degree 2 / 4 / 6 with visibility vs. the true HDR (experiments/lighting_model.py), subset 1",
+ "mean": {
+  "sh2": 0.06434125378727913,
+  "sh4": 0.06134192869067192,
+  "sh6": 0.06064038034528494,
+  "true_hdr": 0.11368270516395569
+ },
+ "assets": {
+  "006d315927f4866d04cf0e748dd1319436c0fd478de6813b76c36726694f9ccf/citrus_orchard_puresky_2k_rot130": {
+   "sh2": 0.09180497378110886,
+   "sh4": 0.08762874454259872,
+   "sh6": 0.08668476343154907,
+   "true_hdr": 0.14288176596164703,
+   "true_hdr_setting": [
+    -1,
+    "y",
+    5
+   ],
+   "meta_rotation": 130.3
+  },
+  "4f2ec1e79c1c1286fba9797430ac6454002ab41a06fd3f1f5675920b33d9f7f3/golden_bay_2k_rot008": {
+   "sh2": 0.04750752076506615,
+   "sh4": 0.04274045303463936,
+   "sh6": 0.0423775278031826,
+   "true_hdr": 0.20366962254047394,
+   "true_hdr_setting": [
+    -1,
+    "y",
+    315
+   ],
+   "meta_rotation": 8.4
+  },
+  "696690549f101b572f257585a44826a13ee3aef7b221965f55510fa5feda57c4/monkstown_castle_2k_rot074": {
+   "sh2": 0.036770932376384735,
+   "sh4": 0.02979763224720955,
+   "sh6": 0.029257450252771378,
+   "true_hdr": 0.034217774868011475,
+   "true_hdr_setting": [
+    -1,
+    "z",
+    105
+   ],
+   "meta_rotation": 74.8
+  },
+  "733b441616aed72571542e648f1f92facb0816e178c0d6bd400a195dc9aaa944/newman_lobby_2k_rot223": {
+   "sh2": 0.06712019443511963,
+   "sh4": 0.06905607879161835,
+   "sh6": 0.06830768287181854,
+   "true_hdr": 0.08798530697822571,
+   "true_hdr_setting": [
+    -1,
+    "z",
+    320
+   ],
+   "meta_rotation": 223.4
+  },
+  "796f7904373bb0c75440245a2e4c0bdb499aebf1947004ba095b8f1c50325999/pergola_walkway_2k_rot312": {
+   "sh2": 0.09306878596544266,
+   "sh4": 0.0884871631860733,
+   "sh6": 0.08718384057283401,
+   "true_hdr": 0.099268838763237,
+   "true_hdr_setting": [
+    -1,
+    "z",
+    210
+   ],
+   "meta_rotation": 312.8
+  },
+  "85e3995081716c13c1069841d33b80f9ae0ed201e72ca61eea60f210266ef997/river_alcove_2k_rot320": {
+   "sh2": 0.09758289903402328,
+   "sh4": 0.09436970949172974,
+   "sh6": 0.0926479697227478,
+   "true_hdr": 0.10951966047286987,
+   "true_hdr_setting": [
+    -1,
+    "y",
+    0
+   ],
+   "meta_rotation": 320.9
+  },
+  "8cf9ba0d96a413ab0c26388a4b4cb0cb4612626cc46d9edc8d83a15153e7f0ec/sundowner_deck_2k_rot075": {
+   "sh2": 0.034299276769161224,
+   "sh4": 0.03376692160964012,
+   "sh6": 0.03377106413245201,
+   "true_hdr": 0.03458390384912491,
+   "true_hdr_setting": [
+    -1,
+    "z",
+    105
+   ],
+   "meta_rotation": 75.4
+  },
+  "9fcdd9db238dc193e97cbfb2b871fbf4f59f5f5445a5d12e7c261926155e61f6/victoria_sunset_2k_rot198": {
+   "sh2": 0.03213046118617058,
+   "sh4": 0.02557206153869629,
+   "sh6": 0.02407364919781685,
+   "true_hdr": 0.18627439439296722,
+   "true_hdr_setting": [
+    -1,
+    "y",
+    45
+   ],
+   "meta_rotation": 198.3
+  },
+  "a7da92c5f502b57420ba2fe830ebd9428fda291171181dfdbbb33bfbe2ee3625/citrus_orchard_puresky_2k_rot032": {
+   "sh2": 0.1267395168542862,
+   "sh4": 0.12694747745990753,
+   "sh6": 0.1273879110813141,
+   "true_hdr": 0.12481267750263214,
+   "true_hdr_setting": [
+    -1,
+    "z",
+    150
+   ],
+   "meta_rotation": 32.9
+  },
+  "afd3e3eb7cb61e7ecd965dce74b7cfba20fd7b3f8f51c06e96986810bacf9801/golden_bay_2k_rot123": {
+   "sh2": 0.016387976706027985,
+   "sh4": 0.015053045004606247,
+   "sh6": 0.01471194438636303,
+   "true_hdr": 0.11361310631036758,
+   "true_hdr_setting": [
+    1,
+    "z",
+    210
+   ],
+   "meta_rotation": 123.5
+  }
+ }
+}
