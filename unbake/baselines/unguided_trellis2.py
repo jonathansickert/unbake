@@ -12,9 +12,6 @@ truth's geometry and UV layout. Output per input (see unbake/predictions.py):
     python -m unbake.baselines.unguided_trellis2                       # whole dataset, resolution 1024
     python -m unbake.baselines.unguided_trellis2 --resolution 512 --max-items 2
 
---conditioning pbr_render instead uses the dataset's PNG rendering of the ground-truth PBR asset
-(not available in practice: it leaks the true materials, e.g. specular highlights).
-
 Stages, to keep at most ~5 GB of models in RAM:
   1. DINOv3 image conditioning for all pending reference images (kept on CPU), then DINOv3 is freed.
   2. Shape encoder + material flow model + material decoder: per item, the shape latent is
@@ -59,13 +56,10 @@ parser.add_argument("--max-items", type=int, default=None, help="only the first 
 parser.add_argument("--resolution", type=int, default=1024, choices=(512, 1024),
                     help="voxel resolution of the material stage")
 parser.add_argument("--seed", type=int, default=SEED)
-parser.add_argument("--conditioning", default="baked", choices=("baked", "pbr_render"),
-                    help="baked: unlit render of the baked asset (default); pbr_render: dataset PNG of the GT asset")
 parser.add_argument("--output", default=None, help=f"default: {PREDICTIONS}/trellis_unguided_<resolution>"
-                    "[_pbr_render][_s<seed> unless the seed is the default]")
+                    "[_s<seed> unless the seed is the default]")
 args = parser.parse_args()
 output_dir = args.output or (f"{PREDICTIONS}/trellis_unguided_{args.resolution}"
-                             + ("_pbr_render" if args.conditioning == "pbr_render" else "")
                              + ("" if args.seed == SEED else f"_s{args.seed}"))
 
 dataset = UnbakeDataset(args.data)
@@ -75,8 +69,8 @@ pending = [(item, [l for l in item.lightings if not os.path.isfile(os.path.join(
            for item in items]
 pending = [(item, lightings) for item, lightings in pending if lightings]
 total = sum(len(l) for _, l in pending)
-print(f"{total} predictions to make ({len(items)} items, resolution {args.resolution}, seed {args.seed}, "
-      f"conditioning: {args.conditioning}) -> {output_dir}/")
+print(f"{total} predictions to make ({len(items)} items, resolution {args.resolution}, seed {args.seed}) "
+      f"-> {output_dir}/")
 if not total:
     raise SystemExit
 
@@ -97,11 +91,8 @@ def load(name):
 
 
 def reference_image(item, lighting):
-    if args.conditioning == "pbr_render":
-        image = lighting.image()
-    else:
-        glb = lighting.baked()
-        image = render_unlit(glb, TrellisFrame(np.concatenate([p.positions for p in glb.world_primitives()])))
+    glb = lighting.baked()
+    image = render_unlit(glb, TrellisFrame(np.concatenate([p.positions for p in glb.world_primitives()])))
     assert image.mode == "RGBA", f"reference image for {input_name(item, lighting)} needs a transparent background"
     os.makedirs(out_dir(item, lighting), exist_ok=True)
     image.save(os.path.join(out_dir(item, lighting), "cond.png"))
@@ -155,7 +146,7 @@ with torch.no_grad():
             del pbr_voxel
             glb.save(os.path.join(out_dir(item, lighting), "textured.glb"))
             meta = {"input": lighting.baked_path, "method": "trellis_unguided", "resolution": args.resolution,
-                    "seed": args.seed, "conditioning": args.conditioning,
+                    "seed": args.seed,
                     "view_yaw": YAW_DEG, "view_pitch": PITCH_DEG, "time_s": round(time.time() - t0, 1)}
             with open(os.path.join(out_dir(item, lighting), "meta.json"), "w") as f:
                 json.dump(meta, f, indent=2)

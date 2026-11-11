@@ -5,39 +5,31 @@ Layout: one folder per asset, named by its hash.
 
     data/<item id>/
         pbr.glb                 ground-truth asset with PBR materials
-        meta.json               list of lighting conditions, one per rendering:
+        meta.json               list of lighting conditions, one per baked asset:
                                 {"name", "env_map", "rotation_deg", "exposure"}
-        <name>.png              RGBA rendering of the asset under that lighting
         <name>.glb              the asset with that lighting baked into an (unlit) base color
-                                texture; same geometry as pbr.glb, but its own UV layout
+                                texture; same geometry and UV layout as pbr.glb
 
     for item in UnbakeDataset("data"):
         gt = item.ground_truth()                  # Glb
         for lighting in item.lightings:
-            image = lighting.image()              # PIL RGBA
             baked = lighting.baked()              # Glb
 """
 import json
 import os
 from dataclasses import dataclass
 
-from PIL import Image
-
 from .gltf_io import Glb
 
 
 @dataclass(frozen=True)
 class Lighting:
-    """One lighting condition of an item: its rendering and its baked-lighting asset."""
-    name: str            # e.g. "golden_bay_2k_rot143"; also the file stem of image/baked asset
+    """One lighting condition of an item and its baked-lighting asset."""
+    name: str            # e.g. "golden_bay_2k_rot143"; also the file stem of the baked asset
     env_map: str         # env map file name, e.g. "golden_bay_2k.exr"
     rotation_deg: float  # env map rotation around the up axis
     exposure: float
-    image_path: str
     baked_path: str
-
-    def image(self) -> Image.Image:
-        return Image.open(self.image_path)
 
     def baked(self) -> Glb:
         return Glb(self.baked_path)
@@ -89,14 +81,12 @@ class UnbakeDataset:
                 env_map=m["env_map"],
                 rotation_deg=float(m["rotation_deg"]),
                 exposure=float(m["exposure"]),
-                image_path=os.path.join(path, f"{m['name']}.png"),
                 baked_path=os.path.join(path, f"{m['name']}.glb"),
             )
             for m in meta
         )
         item = DatasetItem(id=item_id, path=path, lightings=lightings)
-        missing = [p for p in (item.ground_truth_path, *(x for l in lightings for x in (l.image_path, l.baked_path)))
-                   if not os.path.isfile(p)]
+        missing = [p for p in (item.ground_truth_path, *(l.baked_path for l in lightings)) if not os.path.isfile(p)]
         assert not missing, f"item {item_id} is incomplete, missing: {', '.join(missing)}"
         return item
 
