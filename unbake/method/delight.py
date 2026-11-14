@@ -7,27 +7,22 @@ is fitted with the prior base color at every covered texel, and the base color i
 texture resolution as baked / (T @ L). Where the shading is weak (deep shadow) the division is unreliable,
 so the result falls back to the prior: weight w = clamp(E / (--shadow * median E), 0, 1) per texel.
 
-    python method/delight.py --prior results/opt_ensemble --out results/delight
+    python -m unbake.method.delight --prior output/predictions/rebake_opt_ensemble --rays 1024 --split 4
 
-Roughness / metallic are set to 0.5 / 0. Output in the baseline format (with textured.glb), so
-baselines/evaluate_uv.py and baselines/evaluate_relit.py apply.
+Roughness / metallic are set to 0.5 / 0. Output in the prediction layout of unbake/predictions.py.
 """
 import argparse
 import json
-import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "baselines"))
-
 import numpy as np
 import torch
-from PIL import Image
 
-from rebake import Asset, srgb_to_linear, linear_to_srgb, fit_lighting, sample_maps, load_result_maps, cosine_rays, sh_basis_order
-from ensemble import write_glb
-from unguided_trellis2 import to_u8
+from unbake.predictions import PREDICTIONS
+from unbake.method.common import write_atlas_maps
+from unbake.method.rebake import (Asset, srgb_to_linear, linear_to_srgb, fit_lighting, sample_maps, load_result_maps,
+                                  cosine_rays, sh_basis_order)
 
 
 def masked_blur(img, mask, sigma):
@@ -92,7 +87,7 @@ def delight(asset, prior_dir, rays, shadow, split=0.0, sh_order=2):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--prior", required=True, help="results folder with the prior base color per input")
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--output", default=f"{PREDICTIONS}/rebake_delight")
     ap.add_argument("--rays", type=int, default=64)
     ap.add_argument("--shadow", type=float, default=0.3, help="shading (relative to the median) below which the prior takes over")
     ap.add_argument("--split", type=float, default=0.0, help="Gaussian sigma in texels (at 1024): low frequencies from the prior, details from the division; 0 = off")
@@ -104,15 +99,14 @@ def main():
         name = meta_path.parent.name
         if args.only and not any(name.startswith(o) for o in args.only.split(",")):
             continue
-        out = Path(args.out) / name
+        out = Path(args.output) / name
         if (out / "meta.json").exists():
             continue
         t0 = time.time()
         meta = json.loads(meta_path.read_text())
         asset = Asset(meta["input"])
         tx, bc, wmean = delight(asset, meta_path.parent, args.rays, args.shadow, args.split, args.sh_order)
-        out.mkdir(parents=True, exist_ok=True)
-        atlas_meta = []
+        maps = {}
         for a, (key, idx) in enumerate(asset.atlases.items()):
             h, w = asset.parts[idx[0]]["texture"].shape[:2]
             img = np.zeros((h, w, 3), np.float32)
@@ -121,17 +115,12 @@ def main():
             yx = tx["yx"].cpu().numpy()[sel]
             img[yx[:, 0], yx[:, 1]] = bc.cpu().numpy()[sel]
             cover[yx[:, 0], yx[:, 1]] = True
-            Image.fromarray(to_u8(img)).save(out / f"tex{a}_basecolor.png")
-            Image.fromarray(np.full((h, w), 128, np.uint8)).save(out / f"tex{a}_roughness.png")
-            Image.fromarray(np.zeros((h, w), np.uint8)).save(out / f"tex{a}_metallic.png")
-            Image.fromarray(to_u8(cover.astype(np.float32))).save(out / f"tex{a}_mask.png")
-            atlas_meta.append({"index": a, "size": [h, w], "parts": [asset.parts[k]["name"] for k in idx]})
-        m = {"input": meta["input"], "method": "delight", "prior": str(meta_path.parent), "atlases": atlas_meta,
-             "rays": args.rays, "shadow": args.shadow, "split": args.split, "sh_order": args.sh_order, "division_weight_mean": round(wmean, 4),
-             "total_s": round(time.time() - t0, 1)}
-        (out / "meta.json").write_text(json.dumps(m, indent=2))
-        write_glb(m, out)
-        print(f"{name[:8]}…{name.split('__')[-1][:20]}: division weight {wmean:.2f}, {m['total_s']} s", flush=True)
+            maps[a] = (img, np.full((h, w), 0.5, np.float32), np.zeros((h, w), np.float32), cover)
+        m = {"method": "rebake_delight", "prior": str(meta_path.parent), "rays": args.rays, "shadow": args.shadow,
+             "split": args.split, "sh_order": args.sh_order, "division_weight_mean": round(wmean, 4),
+             "time_s": round(time.time() - t0, 1)}
+        write_atlas_maps(meta["input"], asset, maps, out, m)
+        print(f"{name[:8]}…{name.split('__')[-1][:20]}: division weight {wmean:.2f}, {m['time_s']} s", flush=True)
         torch.cuda.empty_cache()
 
 
