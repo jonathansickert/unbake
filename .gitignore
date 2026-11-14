@@ -212,4 +212,4 @@ pbr_dataset/*
 data/
 output/
 baked_env/
-baked_multiview/
+baked_specular/
