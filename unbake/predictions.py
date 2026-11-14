@@ -25,6 +25,11 @@ METHOD_NAMES = {
     "supermat": "SuperMat",
     "material_anything": "Material Anything",
     "rgbx": "RGB<->X",
+    "rebake_opt": "Rebake optimization",
+    "rebake_guided": "Rebake guided sampling",
+    "rebake_opt_ensemble": "Rebake optimization, 3 seeds",
+    "rebake_delight": "Rebake optimization, 3 seeds + de-lighting",
+    "latent_upper_bound": "Latent upper bound",
 }
 
 

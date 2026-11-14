@@ -16,6 +16,9 @@ unbake/
     unguided_trellis2.py, supermat.py, material_anything.py, rgbx.py
     patches/            patch for the Material Anything repo
     results/            metrics of the first baseline runs (old protocol, see below)
+  method/               rebake guidance: rebake model, latent optimization, guided sampling, ensembles,
+                        de-lighting (see method/README.md)
+  experiments/          feasibility experiments of the method (see experiments/README.md)
   evaluation/
     metrics.py          UV-space material metrics, image metrics
     render.py           relighting renders (TRELLIS.2 PBR renderer, env maps, held-out cameras)

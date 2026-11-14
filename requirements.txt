@@ -17,3 +17,4 @@ nvdiffrec @ git+https://github.com/JeffreyXiang/nvdiffrec.git@renderutils
 cumesh @ git+https://github.com/JeffreyXiang/CuMesh.git
 flex_gemm @ git+https://github.com/JeffreyXiang/FlexGEMM.git
 ./o-voxel
+OpenEXR
