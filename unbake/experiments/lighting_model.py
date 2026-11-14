@@ -5,9 +5,8 @@ import os
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 import json, sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "method"))
 import cv2, numpy as np, torch
-from rebake import (Asset, srgb_to_linear, linear_to_srgb, sample_maps, load_gt_maps, sh_basis_order,
+from unbake.method.rebake import (Asset, srgb_to_linear, linear_to_srgb, sample_maps, load_gt_maps, sh_basis_order,
                         cosine_rays)
 
 torch.set_grad_enabled(False)

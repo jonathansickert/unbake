@@ -6,7 +6,7 @@ Test 3 (discrimination): rebake error of several candidate material sets (each w
 fitted lighting). The ground truth should have the smallest error, and the rebake error should
 track the albedo error w.r.t. the ground truth.
 
-    python experiments/rebake_discrimination.py --data data/unbake_sub10 --out results/feasibility/rebake.json \
+    python -m unbake.experiments.rebake_discrimination --data data/unbake_sub10 --out results/feasibility/rebake.json \
         --method trellis=results/dataset/all80_trellis_s0 --method supermat=results/dataset/sub10_supermat ...
 """
 import argparse
@@ -14,12 +14,11 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "method"))
 
 import numpy as np
 import torch
 
-from rebake import Asset, srgb_to_linear, rebake_error, sample_maps, load_result_maps, load_gt_maps
+from unbake.method.rebake import Asset, srgb_to_linear, rebake_error, sample_maps, load_result_maps, load_gt_maps
 
 
 def spearman(a, b):

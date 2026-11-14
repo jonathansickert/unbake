@@ -6,23 +6,21 @@ per texel computes the cosine-weighted mean over the views that see it and the w
 deviation sigma. The proposal's confidence weight is w = 1 / (1 + (sigma / tau)^2), tau = median sigma.
 Reports per channel: Spearman(sigma, |mean - GT|) and the error of the confident vs. unconfident half.
 
-    python experiments/confidence.py --pred results/dataset/sub10_supermat --out results/feasibility/confidence.json
+    python -m unbake.experiments.confidence --pred results/dataset/sub10_supermat --out results/feasibility/confidence.json
 """
 import argparse
 import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "method"))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "baselines"))
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
 
-from rebake import Asset, sample_maps, load_gt_maps
-import supermat as S
+from unbake.method.rebake import Asset, sample_maps, load_gt_maps
+import unbake.baselines.supermat as S
 
 
 def spearman(a, b):

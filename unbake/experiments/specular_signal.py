@@ -6,17 +6,16 @@ metallic. Reported per input: residual MAE, Pearson correlation of the (luminanc
 metallic, the fraction of residual variance a small regression on [rough, metal, rough*metal, their squares]
 explains, and the mean residual for metallic / glossy texels vs. the rest.
 
-    python experiments/specular_signal.py data/unbake_sub10 out.json
+    python -m unbake.experiments.specular_signal data/unbake_sub10 out.json
 """
 import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "method"))
 import numpy as np
 import torch
 
-from rebake import Asset, srgb_to_linear, linear_to_srgb, sample_maps, load_gt_maps, fit_lighting
+from unbake.method.rebake import Asset, srgb_to_linear, linear_to_srgb, sample_maps, load_gt_maps, fit_lighting
 
 torch.set_grad_enabled(False)
 rows = {}

@@ -4,7 +4,7 @@ Encodes a real asset, takes a texture latent of the right shape (random, like an
 decodes it with gradients enabled, computes a loss on the decoded per-voxel materials and calls
 backward(). Reports peak VRAM and time per resolution and variant.
 
-    python experiments/decoder_backprop.py <asset.glb>
+    python -m unbake.experiments.decoder_backprop <asset.glb>
 """
 import os
 import sys
@@ -13,16 +13,13 @@ from pathlib import Path
 
 os.environ.setdefault("ATTN_BACKEND", "xformers")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "method"))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "baselines"))
 
 import numpy as np
 import torch
 import trimesh
 
-from unguided_trellis2 import load_parts, normalization, normalize
-from common import set_block_checkpointing
+from unbake.baselines.common import load_parts, normalization, normalize
+from unbake.method.common import set_block_checkpointing
 
 
 VARIANTS = [v for v in os.environ.get("VARIANTS", "plain,block-ckpt").split(",")]
