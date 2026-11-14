@@ -1,15 +1,12 @@
 """Rebake model of the proposal: Lambertian shading under second-order SH lighting with per-point
 visibility (precomputed radiance transfer), fitted to the observed baked colors by least squares.
 
-    c_i = kd_i * (T_i @ L),   kd = base_color_linear * (1 - metallic),
+    c_i = kd_i * (T_i @ L),   kd = base_color_linear (the dataset bakes use the full base color),
     T_ik = E_{w ~ cos}[ V_i(w) * Y_k(w) ]   (cosine-weighted rays, V = 1 if the ray escapes)
 
 All computations in TRELLIS space (unit cube, Z up) so that texel positions map to voxels.
 """
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "baselines"))
 
 import numpy as np
 import torch
@@ -18,7 +15,7 @@ import nvdiffrast.torch as dr
 from PIL import Image
 from cumesh.bvh import cuBVH
 
-from unguided_trellis2 import load_parts, normalization, normalize
+from unbake.baselines.common import load_parts, normalization, normalize, uv_coverage
 
 
 def srgb_to_linear(x):
@@ -154,34 +151,74 @@ def sample_maps(folder_maps, texels):
     return bc, ro, me
 
 
-def load_result_maps(result_dir, asset):
-    """tex<k>_* of a results folder, resized to the baked atlas sizes, keyed by the baked atlas index."""
-    import json
-    meta = json.loads((Path(result_dir) / "meta.json").read_text())
-    by_parts = {frozenset(at["parts"]): at["index"] for at in meta["atlases"]}
+def pbr_maps(path):
+    """{frozenset(part names): {"basecolor", "roughness", "metallic", "mask"}} per texture atlas of a PBR .glb
+    (ground truth or prediction), in [0, 1], base color in texture (sRGB) space."""
     out = {}
-    for a, (key, idx) in enumerate(asset.atlases.items()):
-        h, w = asset.parts[idx[0]]["texture"].shape[:2]
-        r = by_parts[frozenset(asset.parts[k]["name"] for k in idx)]
-        ld = lambda n, mode: np.asarray(Image.open(Path(result_dir) / f"tex{r}_{n}.png").convert(mode).resize(
-            (w, h), Image.BILINEAR), np.float32) / 255
-        out[a] = (ld("basecolor", "RGB"), ld("roughness", "L"), ld("metallic", "L"))
+    groups = {}
+    for p in load_parts(path):
+        groups.setdefault(p["tex_key"], []).append(p)
+    for group in groups.values():
+        mat = group[0]["mesh"].visual.material
+        bc = group[0]["texture"]  # base color texture x factor
+        h, w = bc.shape[:2]
+        mr = getattr(mat, "metallicRoughnessTexture", None)
+        rf = getattr(mat, "roughnessFactor", None)
+        mf = getattr(mat, "metallicFactor", None)
+        rf = 1.0 if rf is None else float(rf)  # glTF defaults
+        mf = 1.0 if mf is None else float(mf)
+        if mr is not None:
+            mr = np.asarray(mr.convert("RGB").resize((w, h), Image.BILINEAR), np.float32) / 255
+            rough, metal = mr[..., 1] * rf, mr[..., 2] * mf
+        else:
+            rough, metal = np.full((h, w), rf, np.float32), np.full((h, w), mf, np.float32)
+        mask = np.zeros((h, w), bool)
+        for p in group:
+            mask |= uv_coverage(p["uv"], np.asarray(p["mesh"].faces), h, w)
+        out[frozenset(p["name"] for p in group)] = {"basecolor": bc, "roughness": rough, "metallic": metal, "mask": mask}
     return out
 
 
-def load_gt_maps(asset, gt_path):
-    """Ground-truth maps keyed by the baked atlas index (parts matched by geometry)."""
-    from evaluate_uv import gt_maps, match_parts
-    gts = gt_maps(gt_path)
-    names = match_parts(asset.parts, load_parts(gt_path))
+def match_parts(src, dst):
+    """Map part names of src to dst: same face count, closest face-centroid mean and extent
+    (robust to different vertex splitting on export); the name is the fallback."""
+    def sig(p):
+        m = p["mesh"]
+        return len(m.faces), np.concatenate([m.triangles_center.mean(0), np.ptp(m.vertices, 0)])
+    dst_sig = [(p["name"], *sig(p)) for p in dst]
+    scale = max(float(np.ptp(np.concatenate([np.asarray(p["mesh"].vertices) for p in dst]), 0).max()), 1e-8)
+    out = {}
+    for p in src:
+        n_f, s = sig(p)
+        cands = [(np.abs(s - ds).max(), name) for name, dn, ds in dst_sig if dn == n_f]
+        best = min(cands, default=(np.inf, None))
+        out[p["name"]] = best[1] if best[0] < 1e-2 * scale else p["name"]
+    return out
+
+
+def load_glb_maps(asset, path):
+    """Maps of a PBR .glb with the asset's geometry, resized to the baked atlas sizes, keyed by the baked
+    atlas index (parts matched by geometry)."""
+    maps = pbr_maps(path)
+    names = match_parts(asset.parts, load_parts(path))
     out = {}
     for a, (key, idx) in enumerate(asset.atlases.items()):
         h, w = asset.parts[idx[0]]["texture"].shape[:2]
-        g = gts[frozenset(names[asset.parts[k]["name"]] for k in idx)]
+        g = maps[frozenset(names[asset.parts[k]["name"]] for k in idx)]
         rs = lambda x: np.asarray(Image.fromarray((np.clip(x, 0, 1) * 255).astype(np.uint8)).resize((w, h), Image.BILINEAR),
                                   np.float32) / 255
         out[a] = (rs(g["basecolor"]), rs(g["roughness"]), rs(g["metallic"]))
     return out
+
+
+def load_gt_maps(asset, gt_path):
+    """Ground-truth maps keyed by the baked atlas index."""
+    return load_glb_maps(asset, gt_path)
+
+
+def load_result_maps(result_dir, asset):
+    """Maps of a prediction folder (textured.glb, see unbake/predictions.py) keyed by the baked atlas index."""
+    return load_glb_maps(asset, str(Path(result_dir) / "textured.glb"))
 
 
 def sh_basis_order(d, lmax):
