@@ -1,0 +1,669 @@
+{
+ "title": "De-lighting (method/delight.py): base color = baked color / shading, lighting fitted with the prior base color, low frequencies from the prior, prior in deep shadow; roughness 0.5 / metallic 0",
+ "dataset": "JonathanSickert/unbake; subset 1 / subset 2 = two disjoint sets of 10 inputs with every object once",
+ "evaluation": {
+  "uv": "MAE / PSNR per channel on the covered texels, base color in sRGB",
+  "relit": "TRELLIS.2 PBR renderer, the 7 environment maps that differ from the bake lighting, 4 views at 512x512"
+ },
+ "note": "the settings were chosen on subset 1 (see settings_search), so subset 2 is the less biased number",
+ "variants": {
+  "prior: latent optimization, mean of seeds 0-2": {
+   "settings": "lambda 0.1 + anchor on each seed, albedo averaged, constant roughness / metallic (method/ensemble.py --const-rm)",
+   "subset 1": {
+    "summary": {
+     "basecolor_mae": 0.0982,
+     "basecolor_psnr": 18.1969,
+     "metallic_mae": 0.2242,
+     "metallic_psnr": 12.3539,
+     "relit_lpips": 0.063,
+     "relit_mae": 0.0961,
+     "relit_psnr": 19.0058,
+     "relit_ssim": 0.9464,
+     "roughness_mae": 0.2243,
+     "roughness_psnr": 11.8544,
+     "n_inputs": 10
+    },
+    "per_input": {
+     "006d315927f4866d04cf0e748dd1319436c0fd478de6813b76c36726694f9ccf/citrus_orchard_puresky_2k_rot130": {
+      "basecolor_mae": 0.0813,
+      "basecolor_psnr": 20.5981,
+      "roughness_mae": 0.1511,
+      "roughness_psnr": 15.1297,
+      "metallic_mae": 0.0613,
+      "metallic_psnr": 12.723,
+      "relit_mae": 0.1148,
+      "relit_psnr": 18.0516,
+      "relit_ssim": 0.9563,
+      "relit_lpips": 0.0476
+     },
+     "4f2ec1e79c1c1286fba9797430ac6454002ab41a06fd3f1f5675920b33d9f7f3/golden_bay_2k_rot008": {
+      "basecolor_mae": 0.0842,
+      "basecolor_psnr": 20.0088,
+      "roughness_mae": 0.3223,
+      "roughness_psnr": 8.6101,
+      "metallic_mae": 0.2197,
+      "metallic_psnr": 10.1564,
+      "relit_mae": 0.1141,
+      "relit_psnr": 16.9602,
+      "relit_ssim": 0.9542,
+      "relit_lpips": 0.0934
+     },
+     "696690549f101b572f257585a44826a13ee3aef7b221965f55510fa5feda57c4/monkstown_castle_2k_rot074": {
+      "basecolor_mae": 0.0623,
+      "basecolor_psnr": 21.2953,
+      "roughness_mae": 0.2482,
+      "roughness_psnr": 10.5367,
+      "metallic_mae": 0.0378,
+      "metallic_psnr": 14.2304,
+      "relit_mae": 0.0514,
+      "relit_psnr": 22.804,
+      "relit_ssim": 0.9303,
+      "relit_lpips": 0.0522
+     },
+     "733b441616aed72571542e648f1f92facb0816e178c0d6bd400a195dc9aaa944/newman_lobby_2k_rot223": {
+      "basecolor_mae": 0.1171,
+      "basecolor_psnr": 17.2068,
+      "roughness_mae": 0.2138,
+      "roughness_psnr": 11.8895,
+      "metallic_mae": 0.1918,
+      "metallic_psnr": 9.7149,
+      "relit_mae": 0.1567,
+      "relit_psnr": 15.0912,
+      "relit_ssim": 0.9418,
+      "relit_lpips": 0.0945
+     },
+     "796f7904373bb0c75440245a2e4c0bdb499aebf1947004ba095b8f1c50325999/pergola_walkway_2k_rot312": {
+      "basecolor_mae": 0.0885,
+      "basecolor_psnr": 19.7316,
+      "roughness_mae": 0.2525,
+      "roughness_psnr": 11.335,
+      "metallic_mae": 0.7168,
+      "metallic_psnr": 2.4629,
+      "relit_mae": 0.1306,
+      "relit_psnr": 15.9536,
+      "relit_ssim": 0.8509,
+      "relit_lpips": 0.1319
+     },
+     "85e3995081716c13c1069841d33b80f9ae0ed201e72ca61eea60f210266ef997/river_alcove_2k_rot320": {
+      "basecolor_mae": 0.1106,
+      "basecolor_psnr": 16.5613,
+      "roughness_mae": 0.2569,
+      "roughness_psnr": 10.2255,
+      "metallic_mae": 0.2901,
+      "metallic_psnr": 5.6637,
+      "relit_mae": 0.0942,
+      "relit_psnr": 17.8623,
+      "relit_ssim": 0.9018,
+      "relit_lpips": 0.1096
+     },
+     "8cf9ba0d96a413ab0c26388a4b4cb0cb4612626cc46d9edc8d83a15153e7f0ec/sundowner_deck_2k_rot075": {
+      "basecolor_mae": 0.0991,
+      "basecolor_psnr": 18.8878,
+      "roughness_mae": 0.2111,
+      "roughness_psnr": 12.2092,
+      "metallic_mae": 0.024,
+      "metallic_psnr": 18.3798,
+      "relit_mae": 0.0732,
+      "relit_psnr": 20.9611,
+      "relit_ssim": 0.9785,
+      "relit_lpips": 0.034
+     },
+     "9fcdd9db238dc193e97cbfb2b871fbf4f59f5f5445a5d12e7c261926155e61f6/victoria_sunset_2k_rot198": {
+      "basecolor_mae": 0.0862,
+      "basecolor_psnr": 17.0689,
+      "roughness_mae": 0.1547,
+      "roughness_psnr": 14.2216,
+      "metallic_mae": 0.002,
+      "metallic_psnr": 27.2343,
+      "relit_mae": 0.0329,
+      "relit_psnr": 26.4308,
+      "relit_ssim": 0.9948,
+      "relit_lpips": 0.0083
+     },
+     "a7da92c5f502b57420ba2fe830ebd9428fda291171181dfdbbb33bfbe2ee3625/citrus_orchard_puresky_2k_rot032": {
+      "basecolor_mae": 0.0896,
+      "basecolor_psnr": 18.79,
+      "roughness_mae": 0.1338,
+      "roughness_psnr": 14.4357,
+      "metallic_mae": 0.6755,
+      "metallic_psnr": 2.6375,
+      "relit_mae": 0.1156,
+      "relit_psnr": 17.2639,
+      "relit_ssim": 0.9777,
+      "relit_lpips": 0.0262
+     },
+     "afd3e3eb7cb61e7ecd965dce74b7cfba20fd7b3f8f51c06e96986810bacf9801/golden_bay_2k_rot123": {
+      "basecolor_mae": 0.163,
+      "basecolor_psnr": 11.8199,
+      "roughness_mae": 0.2982,
+      "roughness_psnr": 9.9507,
+      "metallic_mae": 0.0231,
+      "metallic_psnr": 20.3365,
+      "relit_mae": 0.0773,
+      "relit_psnr": 18.679,
+      "relit_ssim": 0.9773,
+      "relit_lpips": 0.032
+     }
+    }
+   },
+   "subset 2": {
+    "summary": {
+     "basecolor_mae": 0.1026,
+     "basecolor_psnr": 18.0877,
+     "metallic_mae": 0.2242,
+     "metallic_psnr": 12.3539,
+     "relit_lpips": 0.0597,
+     "relit_mae": 0.1079,
+     "relit_psnr": 17.8281,
+     "relit_ssim": 0.9444,
+     "roughness_mae": 0.2243,
+     "roughness_psnr": 11.8544,
+     "n_inputs": 10
+    },
+    "per_input": {
+     "006d315927f4866d04cf0e748dd1319436c0fd478de6813b76c36726694f9ccf/pergola_walkway_2k_rot209": {
+      "basecolor_mae": 0.0726,
+      "basecolor_psnr": 21.2679,
+      "roughness_mae": 0.1511,
+      "roughness_psnr": 15.1297,
+      "metallic_mae": 0.0613,
+      "metallic_psnr": 12.723,
+      "relit_mae": 0.1109,
+      "relit_psnr": 18.1243,
+      "relit_ssim": 0.9593,
+      "relit_lpips": 0.0496
+     },
+     "4f2ec1e79c1c1286fba9797430ac6454002ab41a06fd3f1f5675920b33d9f7f3/river_alcove_2k_rot203": {
+      "basecolor_mae": 0.0835,
+      "basecolor_psnr": 20.0754,
+      "roughness_mae": 0.3223,
+      "roughness_psnr": 8.6101,
+      "metallic_mae": 0.2197,
+      "metallic_psnr": 10.1564,
+      "relit_mae": 0.1677,
+      "relit_psnr": 14.761,
+      "relit_ssim": 0.9429,
+      "relit_lpips": 0.0487
+     },
+     "696690549f101b572f257585a44826a13ee3aef7b221965f55510fa5feda57c4/sundowner_deck_2k_rot026": {
+      "basecolor_mae": 0.082,
+      "basecolor_psnr": 19.5332,
+      "roughness_mae": 0.2482,
+      "roughness_psnr": 10.5367,
+      "metallic_mae": 0.0378,
+      "metallic_psnr": 14.2304,
+      "relit_mae": 0.0773,
+      "relit_psnr": 20.0144,
+      "relit_ssim": 0.9187,
+      "relit_lpips": 0.0583
+     },
+     "733b441616aed72571542e648f1f92facb0816e178c0d6bd400a195dc9aaa944/victoria_sunset_2k_rot321": {
+      "basecolor_mae": 0.0793,
+      "basecolor_psnr": 20.472,
+      "roughness_mae": 0.2138,
+      "roughness_psnr": 11.8895,
+      "metallic_mae": 0.1918,
+      "metallic_psnr": 9.7149,
+      "relit_mae": 0.119,
+      "relit_psnr": 17.4082,
+      "relit_ssim": 0.9575,
+      "relit_lpips": 0.0724
+     },
+     "796f7904373bb0c75440245a2e4c0bdb499aebf1947004ba095b8f1c50325999/citrus_orchard_puresky_2k_rot071": {
+      "basecolor_mae": 0.0564,
+      "basecolor_psnr": 22.0724,
+      "roughness_mae": 0.2525,
+      "roughness_psnr": 11.335,
+      "metallic_mae": 0.7168,
+      "metallic_psnr": 2.4629,
+      "relit_mae": 0.1174,
+      "relit_psnr": 16.7828,
+      "relit_ssim": 0.8565,
+      "relit_lpips": 0.1344
+     },
+     "85e3995081716c13c1069841d33b80f9ae0ed201e72ca61eea60f210266ef997/golden_bay_2k_rot039": {
+      "basecolor_mae": 0.1283,
+      "basecolor_psnr": 14.764,
+      "roughness_mae": 0.2569,
+      "roughness_psnr": 10.2255,
+      "metallic_mae": 0.2901,
+      "metallic_psnr": 5.6637,
+      "relit_mae": 0.1242,
+      "relit_psnr": 15.6815,
+      "relit_ssim": 0.8869,
+      "relit_lpips": 0.1271
+     },
+     "8cf9ba0d96a413ab0c26388a4b4cb0cb4612626cc46d9edc8d83a15153e7f0ec/monkstown_castle_2k_rot003": {
+      "basecolor_mae": 0.0991,
+      "basecolor_psnr": 18.8944,
+      "roughness_mae": 0.2111,
+      "roughness_psnr": 12.2092,
+      "metallic_mae": 0.024,
+      "metallic_psnr": 18.3798,
+      "relit_mae": 0.0787,
+      "relit_psnr": 20.4155,
+      "relit_ssim": 0.9763,
+      "relit_lpips": 0.0356
+     },
+     "9fcdd9db238dc193e97cbfb2b871fbf4f59f5f5445a5d12e7c261926155e61f6/newman_lobby_2k_rot195": {
+      "basecolor_mae": 0.1742,
+      "basecolor_psnr": 13.1729,
+      "roughness_mae": 0.1547,
+      "roughness_psnr": 14.2216,
+      "metallic_mae": 0.002,
+      "metallic_psnr": 27.2343,
+      "relit_mae": 0.0936,
+      "relit_psnr": 19.1848,
+      "relit_ssim": 0.9912,
+      "relit_lpips": 0.0131
+     },
+     "a7da92c5f502b57420ba2fe830ebd9428fda291171181dfdbbb33bfbe2ee3625/pergola_walkway_2k_rot088": {
+      "basecolor_mae": 0.0894,
+      "basecolor_psnr": 18.8261,
+      "roughness_mae": 0.1338,
+      "roughness_psnr": 14.4357,
+      "metallic_mae": 0.6755,
+      "metallic_psnr": 2.6375,
+      "relit_mae": 0.1147,
+      "relit_psnr": 17.2558,
+      "relit_ssim": 0.9775,
+      "relit_lpips": 0.0256
+     },
+     "afd3e3eb7cb61e7ecd965dce74b7cfba20fd7b3f8f51c06e96986810bacf9801/river_alcove_2k_rot233": {
+      "basecolor_mae": 0.1616,
+      "basecolor_psnr": 11.7984,
+      "roughness_mae": 0.2982,
+      "roughness_psnr": 9.9507,
+      "metallic_mae": 0.0231,
+      "metallic_psnr": 20.3365,
+      "relit_mae": 0.0758,
+      "relit_psnr": 18.6523,
+      "relit_ssim": 0.9769,
+      "relit_lpips": 0.0319
+     }
+    }
+   }
+  },
+  "de-lighting on the prior": {
+   "settings": "--rays 1024 --shadow 0.3 --split 4 --sh-order 2",
+   "subset 1": {
+    "summary": {
+     "basecolor_mae": 0.0914,
+     "basecolor_psnr": 18.7758,
+     "metallic_mae": 0.2242,
+     "metallic_psnr": 12.3539,
+     "relit_lpips": 0.0603,
+     "relit_mae": 0.093,
+     "relit_psnr": 19.168,
+     "relit_ssim": 0.952,
+     "roughness_mae": 0.2243,
+     "roughness_psnr": 11.8544,
+     "n_inputs": 10
+    },
+    "per_input": {
+     "006d315927f4866d04cf0e748dd1319436c0fd478de6813b76c36726694f9ccf/citrus_orchard_puresky_2k_rot130": {
+      "basecolor_mae": 0.0801,
+      "basecolor_psnr": 20.604,
+      "roughness_mae": 0.1511,
+      "roughness_psnr": 15.1297,
+      "metallic_mae": 0.0613,
+      "metallic_psnr": 12.723,
+      "relit_mae": 0.1102,
+      "relit_psnr": 18.2718,
+      "relit_ssim": 0.9564,
+      "relit_lpips": 0.0443
+     },
+     "4f2ec1e79c1c1286fba9797430ac6454002ab41a06fd3f1f5675920b33d9f7f3/golden_bay_2k_rot008": {
+      "basecolor_mae": 0.0846,
+      "basecolor_psnr": 20.032,
+      "roughness_mae": 0.3223,
+      "roughness_psnr": 8.6101,
+      "metallic_mae": 0.2197,
+      "metallic_psnr": 10.1564,
+      "relit_mae": 0.1121,
+      "relit_psnr": 17.1085,
+      "relit_ssim": 0.9653,
+      "relit_lpips": 0.0834
+     },
+     "696690549f101b572f257585a44826a13ee3aef7b221965f55510fa5feda57c4/monkstown_castle_2k_rot074": {
+      "basecolor_mae": 0.0408,
+      "basecolor_psnr": 23.4001,
+      "roughness_mae": 0.2482,
+      "roughness_psnr": 10.5367,
+      "metallic_mae": 0.0378,
+      "metallic_psnr": 14.2304,
+      "relit_mae": 0.0464,
+      "relit_psnr": 23.5204,
+      "relit_ssim": 0.9671,
+      "relit_lpips": 0.0344
+     },
+     "733b441616aed72571542e648f1f92facb0816e178c0d6bd400a195dc9aaa944/newman_lobby_2k_rot223": {
+      "basecolor_mae": 0.116,
+      "basecolor_psnr": 17.2332,
+      "roughness_mae": 0.2138,
+      "roughness_psnr": 11.8895,
+      "metallic_mae": 0.1918,
+      "metallic_psnr": 9.7149,
+      "relit_mae": 0.1556,
+      "relit_psnr": 15.1078,
+      "relit_ssim": 0.9223,
+      "relit_lpips": 0.1302
+     },
+     "796f7904373bb0c75440245a2e4c0bdb499aebf1947004ba095b8f1c50325999/pergola_walkway_2k_rot312": {
+      "basecolor_mae": 0.0747,
+      "basecolor_psnr": 21.05,
+      "roughness_mae": 0.2525,
+      "roughness_psnr": 11.335,
+      "metallic_mae": 0.7168,
+      "metallic_psnr": 2.4629,
+      "relit_mae": 0.1197,
+      "relit_psnr": 16.5814,
+      "relit_ssim": 0.8834,
+      "relit_lpips": 0.1031
+     },
+     "85e3995081716c13c1069841d33b80f9ae0ed201e72ca61eea60f210266ef997/river_alcove_2k_rot320": {
+      "basecolor_mae": 0.1291,
+      "basecolor_psnr": 14.7268,
+      "roughness_mae": 0.2569,
+      "roughness_psnr": 10.2255,
+      "metallic_mae": 0.2901,
+      "metallic_psnr": 5.6637,
+      "relit_mae": 0.1031,
+      "relit_psnr": 16.6337,
+      "relit_ssim": 0.8886,
+      "relit_lpips": 0.119
+     },
+     "8cf9ba0d96a413ab0c26388a4b4cb0cb4612626cc46d9edc8d83a15153e7f0ec/sundowner_deck_2k_rot075": {
+      "basecolor_mae": 0.09,
+      "basecolor_psnr": 19.2911,
+      "roughness_mae": 0.2111,
+      "roughness_psnr": 12.2092,
+      "metallic_mae": 0.024,
+      "metallic_psnr": 18.3798,
+      "relit_mae": 0.067,
+      "relit_psnr": 21.5,
+      "relit_ssim": 0.9777,
+      "relit_lpips": 0.0329
+     },
+     "9fcdd9db238dc193e97cbfb2b871fbf4f59f5f5445a5d12e7c261926155e61f6/victoria_sunset_2k_rot198": {
+      "basecolor_mae": 0.0882,
+      "basecolor_psnr": 17.0413,
+      "roughness_mae": 0.1547,
+      "roughness_psnr": 14.2216,
+      "metallic_mae": 0.002,
+      "metallic_psnr": 27.2343,
+      "relit_mae": 0.0343,
+      "relit_psnr": 26.2239,
+      "relit_ssim": 0.9942,
+      "relit_lpips": 0.0072
+     },
+     "a7da92c5f502b57420ba2fe830ebd9428fda291171181dfdbbb33bfbe2ee3625/citrus_orchard_puresky_2k_rot032": {
+      "basecolor_mae": 0.0625,
+      "basecolor_psnr": 21.8764,
+      "roughness_mae": 0.1338,
+      "roughness_psnr": 14.4357,
+      "metallic_mae": 0.6755,
+      "metallic_psnr": 2.6375,
+      "relit_mae": 0.1057,
+      "relit_psnr": 17.9189,
+      "relit_ssim": 0.9827,
+      "relit_lpips": 0.0224
+     },
+     "afd3e3eb7cb61e7ecd965dce74b7cfba20fd7b3f8f51c06e96986810bacf9801/golden_bay_2k_rot123": {
+      "basecolor_mae": 0.1476,
+      "basecolor_psnr": 12.5029,
+      "roughness_mae": 0.2982,
+      "roughness_psnr": 9.9507,
+      "metallic_mae": 0.0231,
+      "metallic_psnr": 20.3365,
+      "relit_mae": 0.0757,
+      "relit_psnr": 18.8139,
+      "relit_ssim": 0.9825,
+      "relit_lpips": 0.0261
+     }
+    }
+   },
+   "subset 2": {
+    "summary": {
+     "basecolor_mae": 0.0955,
+     "basecolor_psnr": 18.688,
+     "metallic_mae": 0.2242,
+     "metallic_psnr": 12.3539,
+     "relit_lpips": 0.0559,
+     "relit_mae": 0.1028,
+     "relit_psnr": 18.0862,
+     "relit_ssim": 0.9515,
+     "roughness_mae": 0.2243,
+     "roughness_psnr": 11.8544,
+     "n_inputs": 10
+    },
+    "per_input": {
+     "006d315927f4866d04cf0e748dd1319436c0fd478de6813b76c36726694f9ccf/pergola_walkway_2k_rot209": {
+      "basecolor_mae": 0.0728,
+      "basecolor_psnr": 20.9916,
+      "roughness_mae": 0.1511,
+      "roughness_psnr": 15.1297,
+      "metallic_mae": 0.0613,
+      "metallic_psnr": 12.723,
+      "relit_mae": 0.1053,
+      "relit_psnr": 18.4229,
+      "relit_ssim": 0.9552,
+      "relit_lpips": 0.0526
+     },
+     "4f2ec1e79c1c1286fba9797430ac6454002ab41a06fd3f1f5675920b33d9f7f3/river_alcove_2k_rot203": {
+      "basecolor_mae": 0.083,
+      "basecolor_psnr": 19.4067,
+      "roughness_mae": 0.3223,
+      "roughness_psnr": 8.6101,
+      "metallic_mae": 0.2197,
+      "metallic_psnr": 10.1564,
+      "relit_mae": 0.1504,
+      "relit_psnr": 15.3565,
+      "relit_ssim": 0.9514,
+      "relit_lpips": 0.0469
+     },
+     "696690549f101b572f257585a44826a13ee3aef7b221965f55510fa5feda57c4/sundowner_deck_2k_rot026": {
+      "basecolor_mae": 0.0576,
+      "basecolor_psnr": 21.2321,
+      "roughness_mae": 0.2482,
+      "roughness_psnr": 10.5367,
+      "metallic_mae": 0.0378,
+      "metallic_psnr": 14.2304,
+      "relit_mae": 0.0734,
+      "relit_psnr": 20.3238,
+      "relit_ssim": 0.9553,
+      "relit_lpips": 0.0406
+     },
+     "733b441616aed72571542e648f1f92facb0816e178c0d6bd400a195dc9aaa944/victoria_sunset_2k_rot321": {
+      "basecolor_mae": 0.078,
+      "basecolor_psnr": 20.5616,
+      "roughness_mae": 0.2138,
+      "roughness_psnr": 11.8895,
+      "metallic_mae": 0.1918,
+      "metallic_psnr": 9.7149,
+      "relit_mae": 0.1174,
+      "relit_psnr": 17.4814,
+      "relit_ssim": 0.947,
+      "relit_lpips": 0.0942
+     },
+     "796f7904373bb0c75440245a2e4c0bdb499aebf1947004ba095b8f1c50325999/citrus_orchard_puresky_2k_rot071": {
+      "basecolor_mae": 0.0463,
+      "basecolor_psnr": 24.1847,
+      "roughness_mae": 0.2525,
+      "roughness_psnr": 11.335,
+      "metallic_mae": 0.7168,
+      "metallic_psnr": 2.4629,
+      "relit_mae": 0.1099,
+      "relit_psnr": 17.3015,
+      "relit_ssim": 0.8838,
+      "relit_lpips": 0.1088
+     },
+     "85e3995081716c13c1069841d33b80f9ae0ed201e72ca61eea60f210266ef997/golden_bay_2k_rot039": {
+      "basecolor_mae": 0.1366,
+      "basecolor_psnr": 13.9568,
+      "roughness_mae": 0.2569,
+      "roughness_psnr": 10.2255,
+      "metallic_mae": 0.2901,
+      "metallic_psnr": 5.6637,
+      "relit_mae": 0.1246,
+      "relit_psnr": 15.4246,
+      "relit_ssim": 0.8909,
+      "relit_lpips": 0.1205
+     },
+     "8cf9ba0d96a413ab0c26388a4b4cb0cb4612626cc46d9edc8d83a15153e7f0ec/monkstown_castle_2k_rot003": {
+      "basecolor_mae": 0.0901,
+      "basecolor_psnr": 19.3609,
+      "roughness_mae": 0.2111,
+      "roughness_psnr": 12.2092,
+      "metallic_mae": 0.024,
+      "metallic_psnr": 18.3798,
+      "relit_mae": 0.0743,
+      "relit_psnr": 20.7577,
+      "relit_ssim": 0.9768,
+      "relit_lpips": 0.0342
+     },
+     "9fcdd9db238dc193e97cbfb2b871fbf4f59f5f5445a5d12e7c261926155e61f6/newman_lobby_2k_rot195": {
+      "basecolor_mae": 0.1759,
+      "basecolor_psnr": 13.0628,
+      "roughness_mae": 0.1547,
+      "roughness_psnr": 14.2216,
+      "metallic_mae": 0.002,
+      "metallic_psnr": 27.2343,
+      "relit_mae": 0.0965,
+      "relit_psnr": 18.9071,
+      "relit_ssim": 0.9901,
+      "relit_lpips": 0.0132
+     },
+     "a7da92c5f502b57420ba2fe830ebd9428fda291171181dfdbbb33bfbe2ee3625/pergola_walkway_2k_rot088": {
+      "basecolor_mae": 0.0625,
+      "basecolor_psnr": 21.8323,
+      "roughness_mae": 0.1338,
+      "roughness_psnr": 14.4357,
+      "metallic_mae": 0.6755,
+      "metallic_psnr": 2.6375,
+      "relit_mae": 0.1041,
+      "relit_psnr": 17.9614,
+      "relit_ssim": 0.9829,
+      "relit_lpips": 0.0217
+     },
+     "afd3e3eb7cb61e7ecd965dce74b7cfba20fd7b3f8f51c06e96986810bacf9801/river_alcove_2k_rot233": {
+      "basecolor_mae": 0.1525,
+      "basecolor_psnr": 12.2902,
+      "roughness_mae": 0.2982,
+      "roughness_psnr": 9.9507,
+      "metallic_mae": 0.0231,
+      "metallic_psnr": 20.3365,
+      "relit_mae": 0.0724,
+      "relit_psnr": 18.9255,
+      "relit_ssim": 0.9818,
+      "relit_lpips": 0.026
+     }
+    }
+   }
+  }
+ },
+ "settings_search": {
+  "description": "grid of --rays (r), --split (s) and --shadow (sh, default 0.3) on subset 1, UV metrics only",
+  "summaries": {
+   "r1024_s4_sh0.3": {
+    "basecolor_mae": 0.0914,
+    "basecolor_psnr": 18.7758,
+    "metallic_mae": 0.2242,
+    "metallic_psnr": 12.3539,
+    "roughness_mae": 0.2243,
+    "roughness_psnr": 11.8544,
+    "n_inputs": 10
+   },
+   "r1024_s8_sh0.6": {
+    "basecolor_mae": 0.0918,
+    "basecolor_psnr": 18.8026,
+    "metallic_mae": 0.2242,
+    "metallic_psnr": 12.3539,
+    "roughness_mae": 0.2243,
+    "roughness_psnr": 11.8544,
+    "n_inputs": 10
+   },
+   "r256_s0": {
+    "basecolor_mae": 0.0989,
+    "basecolor_psnr": 18.0366,
+    "metallic_mae": 0.2242,
+    "metallic_psnr": 12.3539,
+    "roughness_mae": 0.2243,
+    "roughness_psnr": 11.8544,
+    "n_inputs": 10
+   },
+   "r256_s16": {
+    "basecolor_mae": 0.0926,
+    "basecolor_psnr": 18.7944,
+    "metallic_mae": 0.2242,
+    "metallic_psnr": 12.3539,
+    "roughness_mae": 0.2243,
+    "roughness_psnr": 11.8544,
+    "n_inputs": 10
+   },
+   "r256_s4": {
+    "basecolor_mae": 0.0924,
+    "basecolor_psnr": 18.7028,
+    "metallic_mae": 0.2242,
+    "metallic_psnr": 12.3539,
+    "roughness_mae": 0.2243,
+    "roughness_psnr": 11.8544,
+    "n_inputs": 10
+   },
+   "r256_s4_sh0.6": {
+    "basecolor_mae": 0.0927,
+    "basecolor_psnr": 18.6981,
+    "metallic_mae": 0.2242,
+    "metallic_psnr": 12.3539,
+    "roughness_mae": 0.2243,
+    "roughness_psnr": 11.8544,
+    "n_inputs": 10
+   },
+   "r256_s64": {
+    "basecolor_mae": 0.0947,
+    "basecolor_psnr": 18.8175,
+    "metallic_mae": 0.2242,
+    "metallic_psnr": 12.3539,
+    "roughness_mae": 0.2243,
+    "roughness_psnr": 11.8544,
+    "n_inputs": 10
+   },
+   "r64_s0": {
+    "basecolor_mae": 0.0999,
+    "basecolor_psnr": 17.966,
+    "metallic_mae": 0.2242,
+    "metallic_psnr": 12.3539,
+    "roughness_mae": 0.2243,
+    "roughness_psnr": 11.8544,
+    "n_inputs": 10
+   },
+   "r64_s16": {
+    "basecolor_mae": 0.0949,
+    "basecolor_psnr": 18.6199,
+    "metallic_mae": 0.2242,
+    "metallic_psnr": 12.3539,
+    "roughness_mae": 0.2243,
+    "roughness_psnr": 11.8544,
+    "n_inputs": 10
+   },
+   "r64_s4": {
+    "basecolor_mae": 0.0953,
+    "basecolor_psnr": 18.4896,
+    "metallic_mae": 0.2242,
+    "metallic_psnr": 12.3539,
+    "roughness_mae": 0.2243,
+    "roughness_psnr": 11.8544,
+    "n_inputs": 10
+   },
+   "r64_s64": {
+    "basecolor_mae": 0.0962,
+    "basecolor_psnr": 18.6992,
+    "metallic_mae": 0.2242,
+    "metallic_psnr": 12.3539,
+    "roughness_mae": 0.2243,
+    "roughness_psnr": 11.8544,
+    "n_inputs": 10
+   }
+  }
+ }
+}
