@@ -92,17 +92,7 @@ def process(asset, env_maps, out_dir):
     scene = B.scene = bpy.context.scene
     B.setup()
     setup_render(scene)
-    bpy.ops.import_scene.gltf(filepath=asset)
-    meshes = [o for o in scene.objects if o.type == 'MESH' and o.data.uv_layers]
-    mats = {s.material for o in meshes for s in o.material_slots
-            if s.material and s.material.use_nodes
-            and any(n.type == 'BSDF_PRINCIPLED' for n in s.material.node_tree.nodes)}
-    meshes = [o for o in meshes if all(s.material in mats for s in o.material_slots)]
-    mats = sorted(mats, key=lambda m: m.name)
-    bpy.ops.object.select_all(action='DESELECT')
-    for o in meshes:
-        o.select_set(True)
-    bpy.context.view_layer.objects.active = meshes[0]
+    meshes, mats = B.load_asset(asset)
     bpy.context.view_layer.update()
 
     corners = np.array([list(o.matrix_world @ Vector(c)) for o in meshes for c in o.bound_box])
@@ -110,18 +100,18 @@ def process(asset, env_maps, out_dir):
     ext = np.maximum(hi - lo, 1e-6)
     center, radius = (lo + hi) / 2, float(np.linalg.norm(hi - lo)) / 2
 
-    # Per-texel attributes in the asset's own UVs (texels with alpha > 0 include the bake margin)
+    # Per-texel attributes in the asset's own UVs, for the UV islands plus bake margin (`filled`)
     scene.cycles.samples = 1
     albedo = B.bake(mats, 'EMIT', B.emission_of('Base Color'))
     alpha = B.bake(mats, 'EMIT', B.emission_of('Alpha'))
     pos = B.bake(mats, 'EMIT', attribute_shader('position', tuple(lo), tuple(ext)))
     nrm = B.bake(mats, 'EMIT', attribute_shader('normal', None, None))
-    texels = {m: albedo[m][..., 3] > 0 for m in mats}
+    covered, texels = B.masks(mats)
     P = np.concatenate([lo + pos[m][..., :3][texels[m]] * ext for m in mats])
     N = np.concatenate([nrm[m][..., :3][texels[m]] * 2 - 1 for m in mats])
     N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-6)
     split = np.cumsum([texels[m].sum() for m in mats])[:-1]
-    covered_all = np.concatenate([albedo[m][..., 3][texels[m]] > 0.99 for m in mats])
+    covered_all = np.concatenate([covered[m][texels[m]] for m in mats])
 
     # Cameras on a sphere around the bounding sphere
     cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam'))
@@ -198,18 +188,11 @@ def process(asset, env_maps, out_dir):
 
         # Same exposure normalization as bake_diffuse.py: 99.5th percentile of covered texels -> 1
         exposure = 1.0 / max(float(np.percentile(radiance[covered_all], 99.5)), 1e-6)
-        textures = {}
+        colors = {}
         for m, rad in zip(mats, np.split(radiance, split)):
-            img_rgb = np.zeros((TEX_RES, TEX_RES, 3), np.float32)
-            img_rgb[texels[m]] = rad
-            covered = albedo[m][..., 3] > 0.99
-            has_alpha = bool((alpha[m][..., 0][covered] < 0.99).any())
-            rgba_tex = np.concatenate([B.to_srgb(img_rgb * exposure), alpha[m][..., :1]], axis=-1)
-            img = bpy.data.images.new(m.name, TEX_RES, TEX_RES, alpha=has_alpha)
-            img.alpha_mode = 'STRAIGHT' if has_alpha else 'NONE'
-            img.pixels.foreach_set(rgba_tex.astype(np.float32).ravel())
-            img.pack()
-            textures[m] = img
+            colors[m] = np.zeros((TEX_RES, TEX_RES, 3), np.float32)
+            colors[m][texels[m]] = rad
+        textures = B.make_textures(colors, covered, alpha, exposure)
         B.export_unlit(meshes, mats, textures, os.path.join(out_dir, f'{name}.glb'))
         for img in textures.values():
             bpy.data.images.remove(img)
@@ -226,4 +209,7 @@ if __name__ == '__main__':
     for asset in sorted(glob.glob(os.path.join(root, '*', 'pbr.glb'))):
         if not os.path.exists(os.path.join(os.path.dirname(asset), 'meta_multiview.json')):
             print(f'Baking {asset}', flush=True)
-            process(asset, B.env_maps_in(env_dir), os.path.dirname(asset))
+            try:
+                process(asset, B.env_maps_in(env_dir), os.path.dirname(asset))
+            except Exception as e:   # one bad asset must not stop the run
+                print(f'  failed: {asset}: {e!r}', flush=True)

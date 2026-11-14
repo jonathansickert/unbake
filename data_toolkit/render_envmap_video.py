@@ -18,7 +18,11 @@ import numpy as np
 import bpy
 from mathutils import Vector
 
-EVAL_ENV_MAPS = sorted(glob.glob('env_maps/eval/*.exr'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bake_diffuse as B   # noqa: E402  (shared GPU setup and env map world)
+
+EVAL_ENV_MAPS = sorted(os.path.abspath(p) for p in glob.glob('env_maps/eval/*.exr'))
+assert EVAL_ENV_MAPS, 'no env maps in env_maps/eval/ (run from the repo root)'
 ENV_MAP_MEAN_LUMINANCE = 1.0
 FRAMES, FPS = 96, 24                 # one full env map turn
 RESOLUTION = 512                     # per env map panel
@@ -33,25 +37,14 @@ out_path = os.path.abspath(args[1] if len(args) > 1 else os.path.splitext(glb)[0
 
 def setup_scene():
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    scene = bpy.context.scene
-    scene.render.engine = 'CYCLES'
+    scene = B.scene = bpy.context.scene
+    B.setup()
     scene.cycles.samples = SAMPLES
     scene.cycles.use_denoising = True
     scene.render.resolution_x = scene.render.resolution_y = RESOLUTION
     scene.render.film_transparent = not SHOW_BACKGROUND
     scene.render.image_settings.file_format = 'PNG'
     scene.view_settings.view_transform = 'Standard'
-    prefs = bpy.context.preferences.addons['cycles'].preferences
-    for backend in ('OPTIX', 'CUDA', 'METAL'):
-        try:
-            prefs.compute_device_type = backend
-        except TypeError:
-            continue
-        prefs.get_devices()
-        for d in prefs.devices:
-            d.use = d.type == backend
-        scene.cycles.device = 'GPU'
-        break
     bpy.ops.import_scene.gltf(filepath=os.path.abspath(glb))
     bpy.context.view_layer.update()
 
@@ -71,21 +64,7 @@ def setup_scene():
     cam.rotation_euler = (-direction).to_track_quat('-Z', 'Y').to_euler()
     scene.collection.objects.link(cam)
     scene.camera = cam
-
-    # World: env map -> rotation -> background
-    world = bpy.data.worlds.new('World')
-    world.use_nodes = True
-    nodes, links = world.node_tree.nodes, world.node_tree.links
-    nodes.clear()
-    mapping = nodes.new('ShaderNodeMapping')
-    env = nodes.new('ShaderNodeTexEnvironment')
-    bg = nodes.new('ShaderNodeBackground')
-    links.new(nodes.new('ShaderNodeTexCoord').outputs['Generated'], mapping.inputs['Vector'])
-    links.new(mapping.outputs['Vector'], env.inputs['Vector'])
-    links.new(env.outputs['Color'], bg.inputs['Color'])
-    links.new(bg.outputs[0], nodes.new('ShaderNodeOutputWorld').inputs['Surface'])
-    scene.world = world
-    return scene, mapping, env, bg
+    return scene
 
 
 def luminance_scale(image):
@@ -129,17 +108,16 @@ def encode_video(frame_dirs, names, path):
     bpy.ops.render.render(animation=True, scene=video.name)
 
 
-scene, mapping, env_node, bg = setup_scene()
+scene = setup_scene()
 names = [os.path.splitext(os.path.basename(p))[0].removesuffix('_2k') for p in EVAL_ENV_MAPS]
 with tempfile.TemporaryDirectory() as tmp:
     frame_dirs = []
     for path, name in zip(EVAL_ENV_MAPS, names):
-        env_node.image = bpy.data.images.load(os.path.abspath(path))
-        bg.inputs['Strength'].default_value = luminance_scale(env_node.image)
+        strength = luminance_scale(bpy.data.images.load(path, check_existing=True))
         frame_dirs.append(os.path.join(tmp, name))
         for f in range(FRAMES):
             print(f'{name}: frame {f + 1}/{FRAMES}', flush=True)
-            mapping.inputs['Rotation'].default_value[2] = 2 * math.pi * f / FRAMES
+            B.set_env_map(path, 360 * f / FRAMES, strength)
             scene.render.filepath = os.path.join(frame_dirs[-1], f'{f:04d}.png')
             bpy.ops.render.render(write_still=True)
     encode_video(frame_dirs, names, out_path)

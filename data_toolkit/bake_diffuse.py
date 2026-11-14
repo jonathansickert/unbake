@@ -46,7 +46,7 @@ def setup():
             break
 
 
-def set_env_map(path, rotation_deg):
+def set_env_map(path, rotation_deg, strength=1.0):
     world = scene.world or bpy.data.worlds.new('World')
     scene.world = world
     world.use_nodes = True
@@ -57,6 +57,7 @@ def set_env_map(path, rotation_deg):
     env = nodes.new('ShaderNodeTexEnvironment')
     env.image = bpy.data.images.load(path, check_existing=True)
     bg = nodes.new('ShaderNodeBackground')
+    bg.inputs['Strength'].default_value = strength
     links.new(nodes.new('ShaderNodeTexCoord').outputs['Generated'], mapping.inputs['Vector'])
     links.new(mapping.outputs['Vector'], env.inputs['Vector'])
     links.new(env.outputs['Color'], bg.inputs['Color'])
@@ -65,7 +66,7 @@ def set_env_map(path, rotation_deg):
 
 def bake(mats, type_, shader_fn):
     """Temporarily route each material through shader_fn(mat, bsdf, surface) -> shader socket and bake.
-    Returns {mat: (H, W, 4) float array}; alpha is 1 on baked texels, fractional in the margin."""
+    Returns {mat: (H, W, 4) float array}. Blender sets alpha to 1 on every texel, baked or not: use masks()."""
     temp = {}
     for mat in mats:
         nt = mat.node_tree
@@ -85,9 +86,7 @@ def bake(mats, type_, shader_fn):
         target = mat.node_tree.nodes.active
         px = np.empty(RESOLUTION * RESOLUTION * 4, dtype=np.float32)
         target.image.pixels.foreach_get(px)
-        px = px.reshape(RESOLUTION, RESOLUTION, 4)
-        px[..., :3] /= np.maximum(px[..., 3:], 1e-6)   # margin texels come premultiplied by partial alpha
-        result[mat] = px
+        result[mat] = px.reshape(RESOLUTION, RESOLUTION, 4)
         bpy.data.images.remove(target.image)
         for n in nodes:
             mat.node_tree.nodes.remove(n)
@@ -121,6 +120,23 @@ def irradiance(nt, bsdf, surface):  # noqa: same signature as emission_of's shad
     nt.links.new(surface, mix.inputs[1])
     nt.links.new(diffuse.outputs[0], mix.inputs[2])
     return mix.outputs[0]
+
+
+def white(nt, bsdf, surface):  # noqa: same signature as emission_of's shaders
+    em = nt.nodes.new('ShaderNodeEmission')
+    em.inputs['Color'].default_value = (1, 1, 1, 1)
+    return em.outputs[0]
+
+
+def masks(mats):
+    """(covered, filled) {mat: (H, W) bool}: texels inside the UV islands, and those plus the bake margin.
+    Empty texture space stays black in a bake but gets alpha 1, so alpha can't tell them apart."""
+    margin = scene.render.bake.margin
+    filled = bake(mats, 'EMIT', white)
+    scene.render.bake.margin = 0
+    covered = bake(mats, 'EMIT', white)
+    scene.render.bake.margin = margin
+    return {m: covered[m][..., 0] > 0.5 for m in mats}, {m: filled[m][..., 0] > 0.5 for m in mats}
 
 
 def to_srgb(x):
@@ -163,25 +179,49 @@ def export_unlit(meshes, mats, textures, path):
         mat.name = name
 
 
-def process(asset, env_maps, out_dir):
-    global scene
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    scene = bpy.context.scene
-    setup()
-    bpy.ops.import_scene.gltf(filepath=asset)
+def load_asset(path):
+    """Import a glb and select its bakeable meshes (UVs, only Principled materials).
+    Returns (meshes, materials sorted by name)."""
+    bpy.ops.import_scene.gltf(filepath=path)
     meshes = [o for o in scene.objects if o.type == 'MESH' and o.data.uv_layers]
     mats = {s.material for o in meshes for s in o.material_slots
             if s.material and s.material.use_nodes
             and any(n.type == 'BSDF_PRINCIPLED' for n in s.material.node_tree.nodes)}
     meshes = [o for o in meshes if all(s.material in mats for s in o.material_slots)]
+    if not meshes:
+        raise ValueError('no mesh with UVs and Principled materials')
     bpy.ops.object.select_all(action='DESELECT')
     for o in meshes:
         o.select_set(True)
     bpy.context.view_layer.objects.active = meshes[0]
+    return meshes, sorted(mats, key=lambda m: m.name)
+
+
+def make_textures(colors, covered, alpha, exposure):
+    """{mat: linear (H, W, 3) color} -> {mat: packed sRGB image}, with alpha only where the material has it."""
+    textures = {}
+    for m, color in colors.items():
+        has_alpha = bool((alpha[m][..., 0][covered[m]] < 0.99).any())
+        rgba = np.concatenate([to_srgb(color * exposure), alpha[m][..., :1]], axis=-1)
+        img = bpy.data.images.new(m.name, RESOLUTION, RESOLUTION, alpha=has_alpha)
+        img.alpha_mode = 'STRAIGHT' if has_alpha else 'NONE'
+        img.pixels.foreach_set(rgba.astype(np.float32).ravel())
+        img.pack()
+        textures[m] = img
+    return textures
+
+
+def process(asset, env_maps, out_dir):
+    global scene
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    scene = bpy.context.scene
+    setup()
+    meshes, mats = load_asset(asset)
 
     scene.cycles.samples = 1
     albedo = bake(mats, 'EMIT', emission_of('Base Color'))
     alpha = bake(mats, 'EMIT', emission_of('Alpha'))
+    covered, _ = masks(mats)
     scene.cycles.samples = SAMPLES
     scene.render.bake.use_pass_direct = scene.render.bake.use_pass_indirect = True
     scene.render.bake.use_pass_color = True
@@ -196,19 +236,10 @@ def process(asset, env_maps, out_dir):
         irr = bake(mats, 'DIFFUSE', irradiance)
         color = {m: albedo[m][..., :3] * irr[m][..., :3] for m in mats}
         # One exposure per bake so the 8-bit texture doesn't clip: 99.5th percentile of baked texels -> 1
-        baked = np.concatenate([color[m][albedo[m][..., 3] > 0.99].ravel() for m in mats])
+        baked = np.concatenate([color[m][covered[m]].ravel() for m in mats])
         exposure = 1.0 / max(float(np.percentile(baked, 99.5)), 1e-6)
 
-        textures = {}
-        for m in mats:
-            covered = albedo[m][..., 3] > 0.99
-            has_alpha = bool((alpha[m][..., 0][covered] < 0.99).any())
-            rgba = np.concatenate([to_srgb(color[m] * exposure), alpha[m][..., :1]], axis=-1)
-            img = bpy.data.images.new(m.name, RESOLUTION, RESOLUTION, alpha=has_alpha)
-            img.alpha_mode = 'STRAIGHT' if has_alpha else 'NONE'
-            img.pixels.foreach_set(rgba.astype(np.float32).ravel())
-            img.pack()
-            textures[m] = img
+        textures = make_textures(color, covered, alpha, exposure)
         export_unlit(meshes, mats, textures, os.path.join(out_dir, f'{name}.glb'))
         for img in textures.values():
             bpy.data.images.remove(img)
@@ -228,4 +259,7 @@ if __name__ == '__main__':
     for asset in sorted(glob.glob(os.path.join(root, '*', 'pbr.glb'))):
         if not os.path.exists(os.path.join(os.path.dirname(asset), 'meta.json')):
             print(f'Baking {asset}', flush=True)
-            process(asset, env_maps_in(env_dir), os.path.dirname(asset))
+            try:
+                process(asset, env_maps_in(env_dir), os.path.dirname(asset))
+            except Exception as e:   # one bad asset must not stop the run
+                print(f'  failed: {asset}: {e!r}', flush=True)
