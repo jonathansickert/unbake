@@ -1,36 +1,32 @@
-"""Guided sampling (proposal, Sec. 4): rectified-flow sampling of the TRELLIS.2 texture latent where, at the
-last K sampler steps, the clean-latent estimate x0 = x_t - t v is corrected by a few gradient steps on the
-rebake loss (through the frozen decoder) before sampling continues from the corrected estimate:
+"""Guided sampling: rectified-flow sampling of the TRELLIS.2 texture latent where, at the last K sampler
+steps, the clean-latent estimate x0 = x_t - t v is corrected by a few gradient steps on the rebake loss
+(through the frozen decoder) before sampling continues from the corrected estimate:
 
     x_{t'} = (1 - t') x0_corrected + (sigma_min + (1 - sigma_min) t') eps_hat
 
-Same sampler settings, condition (dataset render) and seed as the unguided baseline, so the difference is the
-guidance only. Output in the baseline format (evaluate_uv.py / evaluate_relit.py / compare.py apply).
+Same sampler settings, conditioning, shape latent and seed as unbake/baselines/unguided_trellis2.py, so
+--guided-steps 0 reproduces the baseline exactly. --init input starts from the encoded baked texture,
+noised to --t-start (SDEdit-like). Output in the prediction layout of unbake/predictions.py.
 
-    python method/guided_sampling.py --data data/unbake_sub10 --out results/feasibility/guided
+    python -m unbake.method.guided_sampling --anchor 1 --skip-last 2
 """
 import os
 import argparse
-import json
-import sys
 import time
-from pathlib import Path
 
-os.environ.setdefault("ATTN_BACKEND", "xformers")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "baselines"))
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 import trimesh
-from PIL import Image
 
-from rebake import Asset, srgb_to_linear, linear_to_srgb, fit_lighting, sample_maps, load_gt_maps
-from unguided_trellis2 import load_pipeline
-from common import set_block_checkpointing, voxel_index, write_result
+from unbake.baselines.common import load_parts, normalization
+from unbake.dataset import UnbakeDataset
+from unbake.predictions import PREDICTIONS, input_name
+from unbake.method.rebake import Asset, srgb_to_linear, linear_to_srgb, fit_lighting, sample_maps, load_gt_maps
+from unbake.method.common import (SEED, load_pipeline, prepare, write_prediction, select_inputs,
+                                  set_block_checkpointing, voxel_index)
 
 ENC_LAYOUT = {"base_color": slice(0, 3), "metallic": slice(3, 4), "roughness": slice(4, 5), "alpha": slice(5, 6)}
 
@@ -40,7 +36,6 @@ def encode_input(baked, enc, res, roughness=0.5, metallic=0.0):
     like experiments/latent_ceiling.py, i.e. in the same TRELLIS space as Asset and the shape latent."""
     import o_voxel
     from trellis2.modules.sparse import SparseTensor
-    from unguided_trellis2 import load_parts, normalization
     parts = load_parts(baked)
     center, scale = normalization(np.concatenate([p["mesh"].vertices for p in parts]))
     scene = trimesh.load(baked, force="scene", process=False)
@@ -73,9 +68,12 @@ def align(src, dst_coords):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--data", required=True)
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--only", default=None)
+    ap.add_argument("--data", default="data", help="dataset root")
+    ap.add_argument("--output", default=None, help=f"default: {PREDICTIONS}/rebake_guided[_s<seed>]")
+    ap.add_argument("--only", default=None, help="comma-separated item id prefixes")
+    ap.add_argument("--lightings", default=None, help="comma-separated lighting names")
+    ap.add_argument("--max-items", type=int, default=None)
+    ap.add_argument("--seed", type=int, default=SEED, help="sampling seed (as unguided_trellis2 --seed)")
     ap.add_argument("--resolution", type=int, default=1024)
     ap.add_argument("--guided-steps", type=int, default=6, help="guide the last K of the sampler steps")
     ap.add_argument("--inner", type=int, default=5, help="gradient steps on x0 per guided sampler step")
@@ -89,12 +87,15 @@ def main():
                     help="input: start from the encoded baked texture, noised to --t-start (SDEdit-like)")
     ap.add_argument("--t-start", type=float, default=1.0, help="start time for --init input (1 = pure noise)")
     ap.add_argument("--metal-prior", type=float, default=0.0, help="weight of the mean decoded metallic (pushes to 0)")
-    ap.add_argument("--tag", default=None, help="results subfolder (default: derived from the settings)")
     args = ap.parse_args()
-    args.steps = args.guided_steps * args.inner  # recorded in meta.json by write_result
-    tag = args.tag or f"K{args.guided_steps}_inner{args.inner}_lr{args.lr}_lam{args.lam}"
+    out_root = args.output or f"{PREDICTIONS}/rebake_guided" + ("" if args.seed == SEED else f"_s{args.seed}")
+    inputs = [(it, l) for it, l in select_inputs(UnbakeDataset(args.data), args.only, args.lightings, args.max_items)
+              if not os.path.isfile(os.path.join(out_root, input_name(it, l), "meta.json"))]
+    print(f"{len(inputs)} inputs to sample -> {out_root}")
+    if not inputs:
+        return
 
-    pipe = load_pipeline("microsoft/TRELLIS.2-4B")
+    pipe = load_pipeline()
     dec = pipe.models["tex_slat_decoder"]
     flow = pipe.models[f"tex_slat_flow_model_{args.resolution}"]
     sampler, params = pipe.tex_slat_sampler, dict(pipe.tex_slat_sampler_params)
@@ -109,34 +110,22 @@ def main():
         from trellis2 import models
         snap = snapshot_download("microsoft/TRELLIS.2-4B", allow_patterns=["ckpts/tex_enc_*"])
         enc = models.from_pretrained(f"{snap}/ckpts/tex_enc_next_dc_f16c32_fp16").cuda().eval()
-    out_root = Path(args.out) / tag
-    log = {}
-    inputs = sorted(Path(args.data).glob("*/*_rot*.glb"))
-    if args.only:
-        inputs = [p for p in inputs if any(p.parent.name.startswith(o) for o in args.only.split(","))]
-
-    for baked in inputs:
-        name = f"{baked.parent.name}__{baked.stem}"
-        out_dir = out_root / name
-        if (out_dir / "meta.json").exists():
-            continue
+    for item, lighting in inputs:
+        name = input_name(item, lighting)
+        baked = lighting.baked_path
         try:
             t0 = time.time()
             asset = Asset(baked)
-            geom = trimesh.Trimesh(np.concatenate(asset.v), np.concatenate(
-                [f + o for f, o in zip(asset.f, np.cumsum([0] + [len(v) for v in asset.v]))]), process=False)
             with torch.no_grad():
-                image = pipe.preprocess_image(Image.open(baked.with_suffix(".png")))
-                torch.manual_seed(0)
-                cond = pipe.get_cond([image], 1024 if args.resolution == 1024 else 512)
-                shape_slat = pipe.encode_shape_slat(geom, args.resolution)
+                cond, shape_slat, frame, image = prepare(pipe, lighting, args.resolution)
             shape_norm = (shape_slat - s_mean) / s_std
+            torch.manual_seed(args.seed)  # the first draw after seeding, as in pipe.sample_tex_slat (CPU RNG)
             noise = shape_norm.replace(feats=torch.randn(shape_norm.coords.shape[0], flow.in_channels - shape_norm.feats.shape[1]
-                                                         ).to("cuda"))  # CPU RNG as in pipe.sample_tex_slat
+                                                         ).to("cuda"))
             tx = asset.texels(args.points)
             T = asset.transfer(tx["pos"], tx["nrm"], 128)
             c_srgb, c_lin = tx["baked"], srgb_to_linear(tx["baked"])
-            gt_bc, gt_ro, gt_me = sample_maps(load_gt_maps(asset, baked.parent / "pbr.glb"), tx)
+            gt_bc, gt_ro, gt_me = sample_maps(load_gt_maps(asset, item.ground_truth_path), tx)
             flow.to("cuda")
             dec.to("cuda")
             set_block_checkpointing(dec, True)
@@ -198,24 +187,21 @@ def main():
                 final = x.replace(feats=x.feats * t_std + t_mean)
                 out = dec(final)
                 pv = out.replace(out.feats.float() * 0.5 + 0.5)
-                out_dir.mkdir(parents=True, exist_ok=True)
-                write_result(asset, pv, args.resolution, layout, out_dir, baked, f"guided_{tag}", args)
                 if vidx is not None:
                     f = pv.feats[vidx[ok]].clamp(0, 1)
                     hist.append({"t": 0.0, "albedo_mae": float((f[:, layout["base_color"]] - gt_bc[ok]).abs().mean()),
                                  "roughness_mae": float((f[:, layout["roughness"]][:, 0] - gt_ro[ok]).abs().mean()),
                                  "metallic_mae": float((f[:, layout["metallic"]][:, 0] - gt_me[ok]).abs().mean())})
-            meta = json.loads((out_dir / "meta.json").read_text())
-            meta.update({"guidance": vars(args), "history": hist})
-            (out_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+                write_prediction(lighting, frame, pv, args.resolution, os.path.join(out_root, name), image=image,
+                                 meta={"method": "rebake_guided", "seed": args.seed, "guidance": vars(args), "history": hist})
             set_block_checkpointing(dec, False)
-            log[name] = hist
-            print(f"{name[:8]}…{baked.stem[:18]}: " + " -> ".join(f"{h['albedo_mae']:.3f}" for h in hist) +
+            print(f"{item.id[:8]}…{lighting.name[:18]}: " + " -> ".join(f"{h['albedo_mae']:.3f}" for h in hist) +
                   f"  ({time.time() - t0:.0f} s)", flush=True)
         except Exception as e:  # log and continue with the next input
             import traceback
             print(f"FAILED {name}: {type(e).__name__}: {str(e)[:200]}", flush=True)
-            (Path(args.out) / f"error_{name}.txt").write_text(traceback.format_exc())
+            os.makedirs(out_root, exist_ok=True)
+            open(os.path.join(out_root, f"error_{name}.txt"), "w").write(traceback.format_exc())
             set_block_checkpointing(dec, False)
             torch.cuda.empty_cache()
         torch.cuda.empty_cache()
