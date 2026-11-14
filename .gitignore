@@ -213,3 +213,4 @@ data/
 output/
 baked_env/
 baked_specular/
+.DS_Store
