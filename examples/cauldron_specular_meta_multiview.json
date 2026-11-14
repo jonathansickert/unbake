@@ -1,0 +1,11 @@
+[
+  {
+    "name": "monkstown_castle_2k_rot267_multiview",
+    "env_map": "monkstown_castle_2k.exr",
+    "rotation_deg": 267.50034745100027,
+    "exposure": 0.9873380849383576,
+    "num_views": 32,
+    "sharpness": 4.0,
+    "unseen_fraction": 0.15411555402516536
+  }
+]
