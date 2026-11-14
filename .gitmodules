@@ -1,3 +1,6 @@
 [submodule "o-voxel/third_party/eigen"]
 	path = o-voxel/third_party/eigen
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "rgbx"]
+	path = rgbx
+	url = https://github.com/zheng95z/rgbx.git

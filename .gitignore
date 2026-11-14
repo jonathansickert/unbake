@@ -209,3 +209,7 @@ __marimo__/
 # ObjaverseXL downloads
 objaverse_cache/
 pbr_dataset/*
+data/
+output/
+baked_env/
+baked_multiview/

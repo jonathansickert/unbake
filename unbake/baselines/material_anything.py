@@ -8,7 +8,7 @@ mesh's UV layout and refines them in UV space. MA keeps the input UVs, so the re
 are already in the original layout. They are written in the same format as
 unguided_trellis2.py, so evaluate_uv.py / evaluate_relit.py work unchanged.
 
-    python baselines/material_anything.py --input pbr_dataset/demo --out results/material_anything \
+    python -m unbake.baselines.material_anything --out output/predictions/material_anything \
         --ma-dir path/to/MaterialAnything --ma-python path/to/ma_env/bin/python
 
 Settings follow MA's bash/test.sh (36 views, UV refinement, --device 2080 i.e. 1024^2 UV
@@ -30,15 +30,13 @@ import time
 import traceback
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 os.environ.setdefault("ATTN_BACKEND", "xformers")
 
 import numpy as np
-import trimesh
 from PIL import Image
 
-from unguided_trellis2 import load_parts, dilate, to_u8
-from evaluate_uv import uv_coverage
+from unbake.baselines.common import export_textured_glb, load_parts, pbr_material, to_u8, uv_coverage
+from unbake.predictions import PREDICTIONS
 
 MA_ARGS = ["--add_view_to_prompt", "--ddim_steps", "50", "--new_strength", "1", "--update_strength", "0.5",
            "--view_threshold", "0.1", "--blend", "0", "--dist", "1.2", "--num_viewpoints", "36",
@@ -126,19 +124,10 @@ def run_asset(path, out_dir, args):
         Image.fromarray(rough).save(out_dir / f"tex{a}_roughness.png")
         Image.fromarray(metal).save(out_dir / f"tex{a}_metallic.png")
         Image.fromarray(to_u8(mask.astype(np.float32))).save(out_dir / f"tex{a}_mask.png")
-        rough_d, metal_d = dilate(rough, mask), dilate(metal, mask)
-        materials[key] = trimesh.visual.material.PBRMaterial(
-            baseColorTexture=Image.fromarray(dilate(bc, mask)),
-            metallicRoughnessTexture=Image.fromarray(np.stack([np.zeros_like(rough_d), rough_d, metal_d], -1)),
-            metallicFactor=1.0, roughnessFactor=1.0, doubleSided=True)
+        materials[key] = pbr_material(bc, rough, metal, mask)
         atlas_meta.append({"index": a, "size": [h, w], "parts": [parts[k]["name"] for k in idx],
                            "coverage": round(float(mask.mean()), 4)})
-    glb = []
-    for p in parts:
-        mesh = p["mesh"].copy()
-        mesh.visual = trimesh.visual.TextureVisuals(uv=p["uv"], material=materials[p["tex_key"]])
-        glb.append(mesh)
-    trimesh.Scene(glb).export(out_dir / "textured.glb")
+    export_textured_glb(parts, lambda p: materials[p["tex_key"]], out_dir / "textured.glb")
     if not args.keep_work:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -152,9 +141,9 @@ def run_asset(path, out_dir, args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--input", required=True, help="an asset file, or a directory searched with --pattern")
-    ap.add_argument("--pattern", default="**/*_baked.glb")
-    ap.add_argument("--out", default="results/material_anything")
+    ap.add_argument("--input", default="data", help="an asset file, or a directory searched with --pattern")
+    ap.add_argument("--pattern", default="*/*_rot*.glb")
+    ap.add_argument("--out", default=f"{PREDICTIONS}/material_anything")
     ap.add_argument("--ma-dir", required=True, help="clone of https://github.com/3DTopia/MaterialAnything, patched")
     ap.add_argument("--ma-python", required=True, help="python of the Material Anything environment")
     ap.add_argument("--work-dir", default="/tmp/material_anything_work", help="MA's intermediate renders (large)")
