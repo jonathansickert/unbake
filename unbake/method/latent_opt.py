@@ -79,6 +79,7 @@ def main():
                 torch.manual_seed(args.seed)
                 tex_slat = pipe.sample_tex_slat(cond, flow, shape_slat)
             z0 = ((tex_slat.feats - mean) / std).detach()
+            dec.to("cuda")  # the pipeline moves models back to the CPU after use (low_vram)
             set_block_checkpointing(dec, True)
 
             tx = asset.texels(args.points)
