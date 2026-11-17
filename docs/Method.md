@@ -234,10 +234,11 @@ CLI: `python -m unbake.guided_trellis2 --input <baked.glb> [--gt <pbr.glb>] --ou
 The script's own defaults are older (512, RGB↔X, no visibility, $s = 1$, $\beta \in \{0.01, 0.1\}$) and are
 kept for reproducing earlier runs.
 
-**Implementation status.** `unbake/guided_dataset.py` still calls `voxel_observations` with its defaults (no
-visibility, $s = 1$). The 1024³ dataset run in `output/predictions/guided_supermat_sv_b1_1024/` therefore uses
-the rebake loss without visibility. Running the dataset with this method needs the two options passed through
-and the priors re-fused for the denser observations.
+**Dataset runs.** `unbake/guided_dataset.py` passes `--visibility` (default 1) and `--supersample` (default 4)
+through, and the fused prior is stored per supersampling, so priors are re-fused for denser observations. The
+output folder name records these settings and the seed (e.g. `guided_supermat_sv_b1_1024_vis_ss4_s1`); the
+earlier 1024³ run without visibility is `guided_supermat_sv_b1_1024/`. With `--beta 0` the 2D prior stage is
+skipped (rebake-only guidance, no SuperMat needed).
 
 **Run time** (1024³, 24 GB MIG slice of an RTX PRO 6000): about 2.5 min per input for guided sampling, 1–2 s for
 visibility, about 20 s for the 16 SuperMat predictions (once the model is loaded), and about 1 min to load the
@@ -280,3 +281,37 @@ input's UV layout.
   fitted shading at texel resolution would recover them, but is not implemented.
 - **Unobserved voxels.** Decoded voxels without an observation (26% at $s = 4$ on the cauldron) get no guidance
   and are only indirectly affected through the shared latent.
+
+---
+
+## 12. Post-processing: seed ensemble and de-lighting
+
+Two steps on finished predictions, both in the prediction layout of `unbake/predictions.py`.
+
+**Seed ensemble** (`unbake/ensemble.py`). The mean of the textures of several predictions of the same inputs,
+e.g. guided samples with seeds 42, 1 and 2. Much of a single sample's base color error is variance between
+samples, so the mean of a few seeds is closer to the ground truth. `--const-rm` sets roughness and metallic to the
+input-as-albedo constants (0.5 / 0).
+
+**De-lighting** (`unbake/delight.py`). Recovers the base color at the texture's own resolution, which the
+$1024^3$ voxel grid cannot represent. The lighting $L$ is fitted as in Sec. 5, but per covered texel, with the
+prior prediction's base color $c_p$ (e.g. the seed ensemble), and the transfer $t$ of Sec. 4 with visibility at the
+texel's surface point. Then, in linear color,
+
+$$c = \frac{o}{t^\top L}, \qquad c \leftarrow w\, c + (1 - w)\, c_p, \qquad
+  w = \operatorname{clamp}\!\left(\frac{e}{0.3 \operatorname{median} e}, 0, 1\right),$$
+
+with $e$ the mean shading over the color channels: where the shading is weak (deep shadow) the division is
+unreliable and the prior takes over. With `--split` ($\sigma = 4$ texels at 1024 px by default), low frequencies
+come from the prior and only details from the division, $c \leftarrow \text{blur}(c_p)\, c / \text{blur}(c)$,
+blurred inside the UV islands. Since the scale and tint of $c$ follow from $L$, which is fitted with $c_p$, the
+prior fixes exactly what the rebake loss cannot (Sec. 5). Roughness and metallic are set to 0.5 / 0, or kept
+from the prior with `--keep-rm`.
+
+```sh
+for s in 42 1 2; do python -m unbake.guided_dataset --resolution 1024 --seed $s --sm-dir ../SuperMat; done
+python -m unbake.ensemble --const-rm --output output/predictions/guided_ensemble \
+    --members output/predictions/guided_supermat_sv_b1_1024_vis_ss4{,_s1,_s2}
+python -m unbake.delight --prior output/predictions/guided_ensemble --output output/predictions/guided_delight
+```
+
