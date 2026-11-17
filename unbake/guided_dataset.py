@@ -54,12 +54,20 @@ parser.add_argument("--lr", type=float, default=0.05)
 parser.add_argument("--huber-delta", type=float, default=0.05)
 parser.add_argument("--lambda-roughness", type=float, default=1.0)
 parser.add_argument("--lambda-metallic", type=float, default=1.0)
-parser.add_argument("--sm-dir", required=True, help="clone of https://github.com/hyj542682306/SuperMat")
+parser.add_argument("--visibility", type=int, default=1, choices=(0, 1), help="visibility in the rebake loss")
+parser.add_argument("--supersample", type=int, default=4, help="observation sampling relative to the texture size")
+parser.add_argument("--vis-dirs", type=int, default=256)
+parser.add_argument("--vis-res", type=int, default=2048)
+parser.add_argument("--sm-dir", default=None, help="clone of https://github.com/hyj542682306/SuperMat (needed for beta > 0)")
 parser.add_argument("--sm-ckpt-dir", default="/tmp/supermat", help="folder with supermat.pth (oyiya/SuperMat)")
 parser.add_argument("--output", default=None, help=f"default: {PREDICTIONS}/guided_supermat_sv_b<beta>")
 args = parser.parse_args()
+if args.beta > 0 and not args.sm_dir:
+    parser.error("--sm-dir is needed for the 2D prior (beta > 0)")
 res = args.resolution
-output_dir = args.output or f"{PREDICTIONS}/guided_supermat_sv_b{args.beta:g}" + ("" if res == 512 else f"_{res}")
+output_dir = args.output or (f"{PREDICTIONS}/guided_supermat_sv_b{args.beta:g}" + ("" if res == 512 else f"_{res}")
+                             + ("_vis" if args.visibility else "") + (f"_ss{args.supersample}" if args.supersample > 1 else "")
+                             + ("" if args.seed == 42 else f"_s{args.seed}"))
 
 dataset = UnbakeDataset(args.data)
 items = [dataset[i] for i in range(len(dataset))[:args.max_items]]
@@ -98,17 +106,17 @@ torch.cuda.empty_cache()
 
 # ---------------------------------------------------------------- 2. 2D prior
 prior_key = lambda lighting: {"input": os.path.abspath(lighting.baked_path), "prior": "supermat_sv", "resolution": res,
-                              "channels": CHANNELS, "views": args.views}
-todo = [(item, l) for item, lightings in pending for l in lightings
+                              "channels": CHANNELS, "views": args.views, "supersample": args.supersample}
+todo = [] if args.beta == 0 else [(item, l) for item, lightings in pending for l in lightings
         if not (os.path.isfile(p := os.path.join(out_dir(item, l), "prior.pt"))
                 and torch.load(p)["key"] == prior_key(l))]
-print(f"[2/3] SuperMat single-view prior ({args.views} views) for {len(todo)} inputs")
+print(f"[2/3] SuperMat single-view prior ({args.views} views) for {len(todo)} inputs" + (" (skipped, beta 0)" if args.beta == 0 else ""))
 if todo:
     supermat = load_supermat_sv(args.sm_dir, args.sm_ckpt_dir)
     for n, (item, lighting) in enumerate(todo):
         t0 = time.time()
         glb = lighting.baked()
-        obs = G.voxel_observations(glb, frame_of(glb), res)
+        obs = G.voxel_observations(glb, frame_of(glb), res, supersample=args.supersample)
         views, _, depths, preds = supermat_sv_views(lighting.baked_path, out_dir(item, lighting), supermat, args.views,
                                                     seed=args.seed)
         value, weight, nviews = fuse(views, depths, preds, obs["centers"], obs["normals"])
@@ -137,10 +145,13 @@ for n, (item, lightings) in enumerate(pending):
     for lighting in lightings:
         t0 = time.time()
         glb = lighting.baked()
-        obs = G.voxel_observations(glb, frame, res)
-        data = torch.load(os.path.join(out_dir(item, lighting), "prior.pt"))
-        prior = Prior2D({c: v.cuda() for c, v in data["value"].items()}, {c: w.cuda() for c, w in data["weight"].items()},
-                        {"roughness": args.lambda_roughness, "metallic": args.lambda_metallic})
+        obs = G.voxel_observations(glb, frame, res, supersample=args.supersample, visibility=bool(args.visibility),
+                                   vis_dirs=args.vis_dirs, vis_res=args.vis_res)
+        prior = None
+        if args.beta > 0:
+            data = torch.load(os.path.join(out_dir(item, lighting), "prior.pt"))
+            prior = Prior2D({c: v.cuda() for c, v in data["value"].items()}, {c: w.cuda() for c, w in data["weight"].items()},
+                            {"roughness": args.lambda_roughness, "metallic": args.lambda_metallic})
         guide = G.Rebake(obs, res, huber_delta=args.huber_delta, prior=prior, beta=args.beta)
         cond = conds.pop((item.id, lighting.name)).cuda()
         cond = {"cond": cond, "neg_cond": torch.zeros_like(cond)}
@@ -150,7 +161,8 @@ for n, (item, lightings) in enumerate(pending):
             pbr = decoder(slat) * 0.5 + 0.5
             _, final = guide(pbr)
         G.write_prediction(lighting.baked_path, frame, pbr, res, os.path.join(out_dir(item, lighting), "textured.glb"))
-        meta = {"input": lighting.baked_path, "method": "guided", "prior": "supermat_sv", "views": args.views,
+        meta = {"input": lighting.baked_path, "method": "guided", "prior": "supermat_sv" if args.beta > 0 else None,
+                "views": args.views, "visibility": bool(args.visibility), "supersample": args.supersample,
                 "resolution": res, "seed": args.seed, "beta": args.beta, "guide_t": list(args.guide_t),
                 "iters": args.iters, "lr": args.lr, "huber_delta": args.huber_delta,
                 "lambda": {"roughness": args.lambda_roughness, "metallic": args.lambda_metallic},
