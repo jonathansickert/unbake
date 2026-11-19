@@ -211,13 +211,16 @@ class Rebake:
 
 # ----------------------------------------------------------------------------------------- guided sampling
 def guided_sample(pipeline, flow, decoder, cond, shape_slat, rebake, seed, guide_t=(0.0, 0.8), iters=3, lr=0.05,
-                  log=print):
+                  log=print, lr_schedule="const"):
     """TRELLIS.2 texture-latent sampling (as Trellis2TexturingPipeline.sample_tex_slat) with rebake guidance at
     the steps with guide_t[0] <= t <= guide_t[1]. rebake=None gives the unguided sample.
 
     The gradient of each loss term is normalized to unit RMS on its own, the terms are combined as
     g_rebake + beta * g_2d, and the sum is rescaled to RMS `lr`: beta sets the 2D prior's share of every step
-    (independent of the terms' magnitudes) and the step size does not depend on beta."""
+    (independent of the terms' magnitudes) and the step size does not depend on beta.
+    lr_schedule "nu" shrinks the step with the posterior variance of x0 given x_t (Pokle et al. 2024; for
+    x_t = (1 - t) x0 + t eps and unit-variance data nu_t^2 = t^2 / (t^2 + (1 - t)^2)), relative to the first
+    guided step: lr_t = lr * nu_t^2 / nu_t0^2."""
     sampler = pipeline.tex_slat_sampler
     params = dict(pipeline.tex_slat_sampler_params)
     steps, rescale_t = params.pop("steps", 50), params.pop("rescale_t", 1.0)
@@ -232,6 +235,9 @@ def guided_sample(pipeline, flow, decoder, cond, shape_slat, rebake, seed, guide
     t_seq = (rescale_t * t_seq / (1 + (rescale_t - 1) * t_seq)).tolist()
     sig = sampler.sigma_min
     history = []
+    nu2 = lambda t: t * t / (t * t + (1 - t) ** 2)
+    guided = [t for t in t_seq[:-1] if guide_t[0] <= t <= guide_t[1]]
+    nu2_first = nu2(guided[0]) if guided else 1.0
     for i in range(steps):
         t, t_prev = t_seq[i], t_seq[i + 1]
         with torch.no_grad():
@@ -241,6 +247,7 @@ def guided_sample(pipeline, flow, decoder, cond, shape_slat, rebake, seed, guide
             x = x - (t - t_prev) * v
             continue
         f = x0.feats.detach().clone().requires_grad_(True)
+        lr_t = lr * nu2(t) / nu2_first if lr_schedule == "nu" else lr
         for k in range(iters):
             with torch.enable_grad():
                 pbr = decoder(x0.replace(f) * t_std + t_mean) * 0.5 + 0.5
@@ -255,7 +262,7 @@ def guided_sample(pipeline, flow, decoder, cond, shape_slat, rebake, seed, guide
                 log("    grad RMS: " + ", ".join(f"{name} {rms(gk).item():.3e}" for name, gk in zip(terms, grads)))
             loss = terms["rebake"] + rebake.beta * terms.get("l2d", 0.0)
             history.append({"step": i, "t": round(t, 4), "iter": k, "loss": loss.item(), **stats})
-            f = (f - lr * g / rms(g)).detach().requires_grad_(True)
+            f = (f - lr_t * g / rms(g)).detach().requires_grad_(True)
             del pbr, loss, g, grads, terms
         extra = "".join(f", {k} {history[-1][k]:.4f}" for k in history[-1] if k.startswith("l2d_"))
         log(f"    step {i:2d} t={t:.3f}: loss {history[-iters]['loss']:.5f} -> {history[-1]['loss']:.5f} "

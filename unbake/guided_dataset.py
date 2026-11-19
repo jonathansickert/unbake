@@ -35,6 +35,7 @@ import trimesh
 
 import unbake.guided_trellis2 as G  # sets up xformers for Blackwell before TRELLIS.2 is imported
 from unbake.dataset import UnbakeDataset
+from unbake.gltf_io import Glb
 from unbake.paths import DATA
 from unbake.predictions import PREDICTIONS, input_name
 from unbake.prior2d import CHANNELS, Prior2D, fuse, load_supermat_sv, supermat_sv_views
@@ -51,6 +52,7 @@ parser.add_argument("--views", type=int, default=16, help="SuperMat single-view 
 parser.add_argument("--guide-t", type=float, nargs=2, default=(0.0, 0.8))
 parser.add_argument("--iters", type=int, default=3)
 parser.add_argument("--lr", type=float, default=0.05)
+parser.add_argument("--lr-schedule", choices=("const", "nu"), default="const", help="step size over the guided steps (see guided_sample)")
 parser.add_argument("--huber-delta", type=float, default=0.05)
 parser.add_argument("--lambda-roughness", type=float, default=1.0)
 parser.add_argument("--lambda-metallic", type=float, default=1.0)
@@ -60,6 +62,13 @@ parser.add_argument("--vis-dirs", type=int, default=256)
 parser.add_argument("--vis-res", type=int, default=2048)
 parser.add_argument("--sm-dir", default=None, help="clone of https://github.com/hyj542682306/SuperMat (needed for beta > 0)")
 parser.add_argument("--sm-ckpt-dir", default="/tmp/supermat", help="folder with supermat.pth (oyiya/SuperMat)")
+parser.add_argument("--cond-from", default=None, help="prediction folder whose base color is rendered as the "
+                    "conditioning image instead of the baked input (e.g. a de-lit prediction)")
+parser.add_argument("--cfg", type=float, default=1.0, help="CFG strength of the texture stage (1 = off, as released)")
+parser.add_argument("--cfg-interval", type=float, nargs=2, default=(0.6, 0.9))
+parser.add_argument("--cfg-rescale", type=float, default=0.0)
+parser.add_argument("--neg-baked", action="store_true", help="negative condition: the baked input's render (default zeros)")
+parser.add_argument("--no-guide", action="store_true", help="no rebake guidance (only the conditioning changes)")
 parser.add_argument("--output", default=None, help=f"default: {PREDICTIONS}/guided_supermat_sv_b<beta>")
 args = parser.parse_args()
 if args.beta > 0 and not args.sm_dir:
@@ -87,6 +96,8 @@ def frame_of(glb):
 
 start = time.time()
 pipeline = G.load_pipeline(res)
+pipeline.tex_slat_sampler_params.update(guidance_strength=args.cfg, guidance_interval=list(args.cfg_interval),
+                                        guidance_rescale=args.cfg_rescale)
 
 # ---------------------------------------------------------------- 1. conditioning
 print(f"[1/3] Image conditioning (DINOv3) for {total} reference images")
@@ -95,11 +106,16 @@ with torch.no_grad():
     for item, lightings in pending:
         for lighting in lightings:
             glb = lighting.baked()
-            image = render_unlit(glb, frame_of(glb))
+            frame = frame_of(glb)
+            image = render_unlit(glb, frame)
             os.makedirs(out_dir(item, lighting), exist_ok=True)
+            feats = lambda img: pipeline.get_cond([pipeline.preprocess_image(img)], res, include_neg_cond=False)["cond"].cpu()
+            baked = feats(image)
+            if args.cond_from:
+                image = render_unlit(Glb(os.path.join(args.cond_from, input_name(item, lighting), "textured.glb")), frame)
             image.save(os.path.join(out_dir(item, lighting), "cond.png"))
-            conds[item.id, lighting.name] = pipeline.get_cond([pipeline.preprocess_image(image)], res,
-                                                              include_neg_cond=False)["cond"].cpu()
+            cond = feats(image) if args.cond_from else baked
+            conds[item.id, lighting.name] = (cond, baked if args.neg_baked else torch.zeros_like(cond))
 pipeline.image_cond_model = None
 gc.collect()
 torch.cuda.empty_cache()
@@ -153,10 +169,11 @@ for n, (item, lightings) in enumerate(pending):
             prior = Prior2D({c: v.cuda() for c, v in data["value"].items()}, {c: w.cuda() for c, w in data["weight"].items()},
                             {"roughness": args.lambda_roughness, "metallic": args.lambda_metallic})
         guide = G.Rebake(obs, res, huber_delta=args.huber_delta, prior=prior, beta=args.beta)
-        cond = conds.pop((item.id, lighting.name)).cuda()
-        cond = {"cond": cond, "neg_cond": torch.zeros_like(cond)}
-        slat, history = G.guided_sample(pipeline, flow, decoder, cond, shape_slat, guide, args.seed,
-                                        tuple(args.guide_t), args.iters, args.lr, log=lambda *a: None)
+        cond, neg = conds.pop((item.id, lighting.name))
+        cond = {"cond": cond.cuda(), "neg_cond": neg.cuda()}
+        slat, history = G.guided_sample(pipeline, flow, decoder, cond, shape_slat, None if args.no_guide else guide, args.seed,
+                                        tuple(args.guide_t), args.iters, args.lr, log=lambda *a: None,
+                                        lr_schedule=args.lr_schedule)
         with torch.no_grad():
             pbr = decoder(slat) * 0.5 + 0.5
             _, final = guide(pbr)
@@ -164,16 +181,18 @@ for n, (item, lightings) in enumerate(pending):
         meta = {"input": lighting.baked_path, "method": "guided", "prior": "supermat_sv" if args.beta > 0 else None,
                 "views": args.views, "visibility": bool(args.visibility), "supersample": args.supersample,
                 "resolution": res, "seed": args.seed, "beta": args.beta, "guide_t": list(args.guide_t),
-                "iters": args.iters, "lr": args.lr, "huber_delta": args.huber_delta,
+                "iters": args.iters, "lr": args.lr, "lr_schedule": args.lr_schedule, "huber_delta": args.huber_delta,
                 "lambda": {"roughness": args.lambda_roughness, "metallic": args.lambda_metallic},
                 "view_yaw": YAW_DEG, "view_pitch": PITCH_DEG,
-                "rebake_loss_first": history[0]["rebake"] if history else None, "final": final,
+                "rebake_loss_first": history[0]["rebake"] if history else None,
+                "cond_from": args.cond_from, "cfg": args.cfg, "cfg_interval": list(args.cfg_interval),
+                "cfg_rescale": args.cfg_rescale, "neg_baked": args.neg_baked, "guided": not args.no_guide, "final": final,
                 "time_s": round(time.time() - t0, 1)}
         with open(os.path.join(out_dir(item, lighting), "meta.json"), "w") as f:
             json.dump(meta, f, indent=2)
         done += 1
         elapsed = time.time() - start
-        print(f"    [{done}/{total}] {lighting.name}: rebake {meta['rebake_loss_first']:.5f} -> {final['rebake']:.5f}, "
+        print(f"    [{done}/{total}] {lighting.name}: rebake {meta['rebake_loss_first'] or float('nan'):.5f} -> {final['rebake']:.5f}, "
               + ", ".join(f"{k} {v:.3f}" for k, v in final.items() if k.startswith("l2d_"))
               + f"  ({meta['time_s']} s; {elapsed / 60:.1f} min, ~{elapsed / done * (total - done) / 60:.0f} min left)",
               flush=True)
