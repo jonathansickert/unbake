@@ -1,0 +1,63 @@
+006d315927f4 done
+4f2ec1e79c1c done
+696690549f10 done
+733b441616ae done
+796f7904373b done
+85e399508171 done
+8cf9ba0d96a4 done
+9fcdd9db238d done
+a7da92c5f502 done
+afd3e3eb7cb6 done
+
+Base color, mean over inputs: MAE, scale-invariant MAE (one scale / per channel), brightness log ratio
+method                                 MAE     si1     si3   log b
+input as albedo                     0.1507  0.1081  0.1048 -0.0590
+guided_vis_delight                  0.1065  0.0578  0.0541  0.1570
+guided_vis_delight_cal              0.1015  0.0584  0.0541 -0.0032
+guided_vis_delight_scale            0.1023  0.0578  0.0541  0.0025
+trellis_ensemble_delight            0.1046  0.0618  0.0580  0.0693
+trellis_ensemble_delight_cal        0.1047  0.0623  0.0580 -0.0059
+trellis_ensemble_delight_scale      0.1081  0.0618  0.0580  0.0118
+  input as albedo: slope of log(pred/gt brightness) over log(gt brightness): -0.36
+  guided_vis_delight: slope of log(pred/gt brightness) over log(gt brightness): -0.45
+  guided_vis_delight_cal: slope of log(pred/gt brightness) over log(gt brightness): -0.65
+  guided_vis_delight_scale: slope of log(pred/gt brightness) over log(gt brightness): -0.51
+  trellis_ensemble_delight: slope of log(pred/gt brightness) over log(gt brightness): -0.43
+  trellis_ensemble_delight_cal: slope of log(pred/gt brightness) over log(gt brightness): -0.67
+  trellis_ensemble_delight_scale: slope of log(pred/gt brightness) over log(gt brightness): -0.48
+
+Per object (n = objects), difference to trellis_ensemble_delight: mean [95% bootstrap CI], Wilcoxon p, objects better
+
+uv base_color
+  input as albedo                   +0.0461 [+0.0209, +0.0749]  p=0.004  1/10
+  guided_vis_delight                +0.0019 [-0.0091, +0.0127]  p=0.695  4/10
+  guided_vis_delight_cal            -0.0031 [-0.0227, +0.0201]  p=0.322  7/10
+  guided_vis_delight_scale          -0.0023 [-0.0141, +0.0118]  p=0.275  8/10
+  trellis_ensemble_delight_cal      +0.0001 [-0.0203, +0.0229]  p=0.846  5/10
+  trellis_ensemble_delight_scale    +0.0035 [-0.0025, +0.0106]  p=0.625  5/10
+
+uv roughness
+  input as albedo                   +0.0001 [-0.0006, +0.0008]  p=0.625  5/10
+  guided_vis_delight                +0.0000 [+0.0000, +0.0000]  p=1.000  0/10
+  guided_vis_delight_cal            +0.0000 [+0.0000, +0.0000]  p=1.000  0/10
+  guided_vis_delight_scale          +0.0000 [+0.0000, +0.0000]  p=1.000  0/10
+  trellis_ensemble_delight_cal      +0.0000 [+0.0000, +0.0000]  p=1.000  0/10
+  trellis_ensemble_delight_scale    +0.0000 [+0.0000, +0.0000]  p=1.000  0/10
+
+uv metallic
+  input as albedo                   +0.0000 [+0.0000, +0.0000]  p=1.000  0/10
+  guided_vis_delight                +0.0000 [+0.0000, +0.0000]  p=1.000  0/10
+  guided_vis_delight_cal            +0.0000 [+0.0000, +0.0000]  p=1.000  0/10
+  guided_vis_delight_scale          +0.0000 [+0.0000, +0.0000]  p=1.000  0/10
+  trellis_ensemble_delight_cal      +0.0000 [+0.0000, +0.0000]  p=1.000  0/10
+  trellis_ensemble_delight_scale    +0.0000 [+0.0000, +0.0000]  p=1.000  0/10
+
+uv base_color si3
+  input as albedo                   +0.0468 [+0.0237, +0.0726]  p=0.002  0/10
+  guided_vis_delight                -0.0039 [-0.0099, +0.0023]  p=0.432  5/10
+  guided_vis_delight_cal            -0.0038 [-0.0099, +0.0023]  p=0.432  5/10
+  guided_vis_delight_scale          -0.0038 [-0.0099, +0.0023]  p=0.432  5/10
+  trellis_ensemble_delight_cal      +0.0000 [+0.0000, +0.0000]  p=0.027  3/10
+  trellis_ensemble_delight_scale    +0.0000 [-0.0000, +0.0000]  p=0.846  4/10
+
+Saved diagnostics.json

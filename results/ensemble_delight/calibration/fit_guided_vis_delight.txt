@@ -1,0 +1,10 @@
+006d315927f4: log m_gt = -0.345 + 0.845 log m_pred
+4f2ec1e79c1c: log m_gt = -0.396 + 0.826 log m_pred
+696690549f10: log m_gt = -0.400 + 0.833 log m_pred
+733b441616ae: log m_gt = -0.214 + 0.927 log m_pred
+796f7904373b: log m_gt = -0.492 + 0.714 log m_pred
+85e399508171: log m_gt = -0.401 + 0.844 log m_pred
+8cf9ba0d96a4: log m_gt = -0.422 + 0.749 log m_pred
+9fcdd9db238d: log m_gt = -0.558 + 0.743 log m_pred
+a7da92c5f502: log m_gt = -0.392 + 0.837 log m_pred
+afd3e3eb7cb6: log m_gt = -0.343 + 0.891 log m_pred
