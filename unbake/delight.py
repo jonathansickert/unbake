@@ -13,6 +13,11 @@ per texel, so details smaller than a voxel come back. Where the shading is weak 
 unreliable and the prior takes over: c <- w c + (1 - w) c_p with w = clamp(e / (shadow * median e), 0, 1),
 e = mean shading. With --split, low frequencies come from the prior and only details from the division:
 c <- blur(c_p) * c / blur(c), a Gaussian of --split texels (at 1024 px) inside the UV islands.
+With --anchor region the low frequencies instead come from one scale per material and channel,
+median(c_p) / median(c) over the well-lit texels (shading above the median), so shading that the prior has
+absorbed over wide areas does not come back. --prior-gt uses the ground truth as the prior (an oracle for the
+floor of the shading model). Colors are converted with the sRGB transfer function (--transfer srgb, as the
+bakes are written) or with gamma 2.2.
 Roughness and metallic are set to 0.5 / 0, or kept from the prior with --keep-rm.
 
     python -m unbake.delight --prior output/predictions/guided_ensemble --output output/predictions/guided_delight
@@ -33,6 +38,18 @@ from unbake.gltf_io import Glb
 from unbake.guided_trellis2 import GAMMA, visibility_transfer
 from unbake.predictions import INPUT_AS_ALBEDO_CONSTANTS, PREDICTION_FILE
 from unbake.uv_bake import TrellisFrame, _rasterize_uv, merge, to_gltf_images
+
+
+def to_linear(x, transfer):
+    if transfer == "gamma":
+        return x ** GAMMA
+    return torch.where(x <= 0.04045, x / 12.92, ((x + 0.055) / 1.055) ** 2.4)
+
+
+def to_srgb(x, transfer):
+    if transfer == "gamma":
+        return x ** (1 / GAMMA)
+    return torch.where(x <= 0.0031308, 12.92 * x, 1.055 * x.clamp(min=0.0031308) ** (1 / 2.4) - 0.055)
 
 
 @torch.no_grad()
@@ -78,7 +95,7 @@ def delight(baked: Glb, prior: Glb, args):
         c = torch.from_numpy(material_maps(prior, material, size)["base_color"]).cuda()
         per_mat[material] = (mask, c, len(p))
         pos.append(p); nrm.append(n)
-        obs.append(o[mask].clamp(0, 1) ** GAMMA); kd.append(c[mask].clamp(1e-4, 1) ** GAMMA)
+        obs.append(to_linear(o[mask].clamp(0, 1), args.transfer)); kd.append(to_linear(c[mask].clamp(1e-4, 1), args.transfer))
     pos, nrm, obs, kd = torch.cat(pos), torch.cat(nrm), torch.cat(obs), torch.cat(kd)
     positions, _, faces = merge(prims, frame)
     T, _ = visibility_transfer(pos, nrm, positions, faces, args.resolution, args.dirs, args.map_res)
@@ -97,14 +114,19 @@ def delight(baked: Glb, prior: Glb, args):
         mask, c, n = per_mat[material]
         d, k, wm = div[start:start + n], kd[start:start + n], w[start:start + n]
         start += n
-        if args.split > 0:
+        if args.anchor == "region":
+            em = E[start - n:start].mean(1)
+            lit = (em > em.median()) & (wm[:, 0] > 0.99)
+            if lit.sum() >= 16:
+                d = (d * k[lit].median(0).values / d[lit].median(0).values.clamp(min=1e-4)).clamp(0, 1)
+        elif args.split > 0:
             h, wd = mask.shape
             s = args.split * max(h, wd) / 1024
             D = torch.zeros(h, wd, 3, device="cuda"); D[mask] = d
             P = torch.zeros(h, wd, 3, device="cuda"); P[mask] = k
             d = (masked_blur(P, mask, s) * D / masked_blur(D, mask, s).clamp(min=1e-4))[mask].clamp(0, 1)
         bc = c.clone()  # outside the UV islands: the prior (keeps its padding)
-        bc[mask] = (wm * d + (1 - wm) * k) ** (1 / GAMMA)
+        bc[mask] = to_srgb((wm * d + (1 - wm) * k).clamp(0, 1), args.transfer)
         out[material] = bc.cpu().numpy()
     return out, float(w.mean())
 
@@ -120,6 +142,9 @@ def main():
     parser.add_argument("--map-res", type=int, default=2048, help="shadow map resolution")
     parser.add_argument("--resolution", type=int, default=1024, help="voxel size for the normal offset of the visibility test")
     parser.add_argument("--ridge", type=float, default=1e-4)
+    parser.add_argument("--anchor", choices=("blur", "region"), default="blur", help="where the low frequencies come from (see above)")
+    parser.add_argument("--transfer", choices=("srgb", "gamma"), default="srgb", help="color transfer function of the textures")
+    parser.add_argument("--prior-gt", action="store_true", help="oracle: the ground truth (pbr.glb next to the input) as the prior")
     parser.add_argument("--keep-rm", action="store_true", help="keep the prior's roughness / metallic")
     args = parser.parse_args()
 
@@ -132,7 +157,8 @@ def main():
             continue
         t0 = time.time()
         meta = json.loads(meta_path.read_text())
-        prior = Glb(str(meta_path.parent / PREDICTION_FILE))
+        prior = Glb(os.path.join(os.path.dirname(meta["input"]), "pbr.glb") if args.prior_gt
+                    else str(meta_path.parent / PREDICTION_FILE))
         glb = Glb(meta["input"])
         maps, wmean = delight(glb, prior, args)
         for material, bc in maps.items():
@@ -145,7 +171,7 @@ def main():
         glb.save(str(out / PREDICTION_FILE))
         (out / "meta.json").write_text(json.dumps({
             "input": meta["input"], "method": "delight", "prior": str(meta_path.parent), "shadow": args.shadow,
-            "split": args.split, "dirs": args.dirs, "keep_rm": args.keep_rm, "division_weight_mean": round(wmean, 4),
+            "split": args.split, "anchor": args.anchor, "transfer": args.transfer, "prior_gt": args.prior_gt, "dirs": args.dirs, "keep_rm": args.keep_rm, "division_weight_mean": round(wmean, 4),
             "time_s": round(time.time() - t0, 1)}, indent=2))
         print(f"{name[:8]}…{name.split('__')[-1][:20]}: division weight {wmean:.2f}, {time.time() - t0:.0f} s", flush=True)
         torch.cuda.empty_cache()
