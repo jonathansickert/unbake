@@ -6,7 +6,9 @@ table, and two LaTeX tables (booktabs, full text width) for the paper.
     python -m unbake.evaluation.compare --latex output/tables.tex
 
 By default only the (item, lighting) inputs that every method has predictions for are used
-(--all: every method on all of its inputs). Best value per column in bold.
+(--all: every method on all of its inputs; in the LaTeX tables a method with fewer inputs than
+the others is marked with a dagger, its subset is named in the caption, and it is not considered
+for the best value). Best value per column in bold.
 """
 import argparse
 import json
@@ -15,6 +17,7 @@ import os
 
 from unbake.evaluation.metrics import CHANNELS
 from unbake.evaluation.summary import summaries
+from unbake.paths import OUTPUT
 from unbake.predictions import INPUT_AS_ALBEDO
 
 LATEX_NAMES = {
@@ -49,24 +52,33 @@ def markdown(summary):
     return "\n".join(lines)
 
 
-def latex(summary, n_items, num_envs, num_views):
+def latex(summary, pairs, num_envs, num_views, label_suffix=""):
+    """`pairs`: {method: set of (item, lighting) inputs behind its row}."""
     names = list(summary)
-    n_light = summary[names[0]]["count"] // n_items
+    full = max(len(pairs[m]) for m in names)
+    partial = [m for m in names if len(pairs[m]) < full]
+    reference = next(m for m in names if m not in partial)
+
+    def extent(m):  # "10 assets $\times$ 8 baked lighting conditions"
+        n_items = len({item for item, _ in pairs[m]})
+        return r"%d assets $\times$ %d baked lighting conditions" % (n_items, len(pairs[m]) // n_items)
+    note = "".join(r" $^\dagger$%s: %s only." % (LATEX_NAMES.get(m, m), extent(m)) for m in partial)
 
     def col(vals, lower, fmt):
-        best = min(vals) if lower else max(vals)
-        return [(r"\textbf{%s}" if v == best else "%s") % fmt(v) for v in vals]
+        best = (min if lower else max)(v for v, m in zip(vals, names) if m not in partial)
+        return [(r"\textbf{%s}" if v == best and m not in partial else "%s") % fmt(v) for v, m in zip(vals, names)]
     f3, f2 = (lambda v: f"{v:.3f}"), (lambda v: f"{v:.2f}")
-    rows = lambda cols: [f"{LATEX_NAMES.get(m, m)} & " + " & ".join(c[i] for c in cols) + r" \\" for i, m in enumerate(names)]
+    label = lambda m: LATEX_NAMES.get(m, m) + (r"$^\dagger$" if m in partial else "")
+    rows = lambda cols: [f"{label(m)} & " + " & ".join(c[i] for c in cols) + r" \\" for i, m in enumerate(names)]
     full_width = lambda n: r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}l" + "c" * n + "}"
 
     cols = [col([summary[m]["uv"][c][metric] for m in names], metric == "MAE", f3 if metric == "MAE" else f2)
             for c, metric in UV_COLS]
     t1 = [r"\begin{table}[t]", r"\centering",
-          r"\caption{Material accuracy in UV space, averaged over %d assets $\times$ %d baked lighting conditions. "
+          r"\caption{Material accuracy in UV space, averaged over %s. "
           r"MAE is weighted by surface area; PSNR (dB) is computed from the mean squared error. The input-as-albedo "
-          r"baseline uses the baked texture as albedo with constant roughness 0.5 and metallic 0.}" % (n_items, n_light),
-          r"\label{tab:materials}", r"\small", full_width(6), r"\toprule",
+          r"baseline uses the baked texture as albedo with constant roughness 0.5 and metallic 0.%s}" % (extent(reference), note),
+          r"\label{tab:materials%s}" % label_suffix, r"\small", full_width(6), r"\toprule",
           r" & \multicolumn{2}{c}{Albedo} & \multicolumn{2}{c}{Roughness} & \multicolumn{2}{c}{Metallic} \\",
           r"\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}",
           r"Method & MAE $\downarrow$ & PSNR $\uparrow$ & MAE $\downarrow$ & PSNR $\uparrow$ & MAE $\downarrow$ & PSNR $\uparrow$ \\",
@@ -75,8 +87,8 @@ def latex(summary, n_items, num_envs, num_views):
     cols = [col([summary[m]["relit"][k] for m in names], lower, f2 if k == "PSNR" else f3) for k, lower in RELIT_COLS]
     t2 = [r"\begin{table}[t]", r"\centering",
           r"\caption{Relighting under %d held-out environment maps not used to create the dataset, %d views each, "
-          r"averaged over %d assets $\times$ %d baked lighting conditions. PSNR in dB.}" % (num_envs, num_views, n_items, n_light),
-          r"\label{tab:relighting}", r"\small", full_width(4), r"\toprule",
+          r"averaged over %s. PSNR in dB.%s}" % (num_envs, num_views, extent(reference), note),
+          r"\label{tab:relighting%s}" % label_suffix, r"\small", full_width(4), r"\toprule",
           r"Method & LPIPS $\downarrow$ & PSNR $\uparrow$ & SSIM $\uparrow$ & MAE $\downarrow$ \\",
           r"\midrule", *rows(cols), r"\bottomrule", r"\end{tabular*}", r"\end{table}"]
 
@@ -87,22 +99,30 @@ def latex(summary, n_items, num_envs, num_views):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--eval", default="output/eval", help="folder with metrics_uv.json and metrics_relit.json")
+    ap.add_argument("--eval", default=os.path.join(OUTPUT, "eval"), help="folder with metrics_uv.json and metrics_relit.json")
     ap.add_argument("--all", action="store_true", help="every method on all of its inputs, not only the common ones")
     ap.add_argument("--latex", default=None, help="also write the LaTeX tables to this file")
+    ap.add_argument("--methods", nargs="+", default=None, help="only these methods (names as in the metrics files)")
+    ap.add_argument("--label-suffix", default="", help="appended to the LaTeX labels, e.g. -subset")
     args = ap.parse_args()
 
     records, methods, relit = load(args.eval)
+    if args.methods:
+        unknown = [m for m in args.methods if m not in methods]
+        assert not unknown, f"not in the metrics: {unknown} (available: {methods})"
+        methods = [m for m in methods if m in args.methods]
     summary, summary_common = summaries(records, methods)
     if not args.all:
         summary = summary_common
-    # items behind the table (with --all: those of the first method)
-    pairs = [{(r["item"], r["lighting"]) for r in records if r["method"] == m} for m in summary]
-    n_items = len({item for item, _ in (pairs[0] if args.all else set.intersection(*pairs))})
+    # inputs behind each row: all of the method's (--all) or those every method has
+    pairs = {m: {(r["item"], r["lighting"]) for r in records if r["method"] == m} for m in summary}
+    if not args.all:
+        common = set.intersection(*pairs.values())
+        pairs = {m: common for m in pairs}
     print(markdown(summary))
     if args.latex:
         with open(args.latex, "w") as f:
-            f.write(latex(summary, n_items, len(relit["env_maps"]), relit["num_views"]))
+            f.write(latex(summary, pairs, len(relit["env_maps"]), relit["num_views"], args.label_suffix))
         print(f"\nSaved {args.latex}")
 
 

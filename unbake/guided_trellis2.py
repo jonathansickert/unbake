@@ -113,15 +113,22 @@ def visibility_transfer(centers, normals, positions, faces, resolution, num_dirs
     return T * (4 * math.pi / num_dirs), unoccluded / hemisphere
 
 
+def frame_normals(n: np.ndarray) -> np.ndarray:
+    """World-space (glTF Y-up) normals -> TRELLIS space: the rotation of to_trellis (uniform scale drops out)."""
+    return np.stack([n[:, 0], -n[:, 2], n[:, 1]], axis=1).astype(np.float32)
+
+
 # ------------------------------------------------------------------------------------------- observations
 @torch.no_grad()
 def voxel_observations(glb: Glb, frame: TrellisFrame, resolution: int, supersample: int = 1, visibility: bool = False,
-                       vis_dirs: int = 256, vis_res: int = 2048):
+                       vis_dirs: int = 256, vis_res: int = 2048, normals: str = "smooth"):
     """
     Observed baked color (linear) and surface normal per voxel of the `resolution` grid, averaged over the
     surface samples (UV rasterization at `supersample` x texture size, texture sampled bilinearly) that fall
-    into the voxel. Returns {keys (M,) sorted, colors (M, 3), transfer (M, 9), centers (M, 3) and normals (M, 3)
-    in TRELLIS space, visible_fraction (M,) (1 without visibility)}.
+    into the voxel. normals="smooth" interpolates the mesh's vertex normals (glTF NORMAL; the baked texture was
+    shaded with them), "face" uses flat triangle normals (also the fallback for primitives without NORMAL).
+    Returns {keys (M,) sorted, colors (M, 3), transfer (M, 9), centers (M, 3) and normals (M, 3) in TRELLIS
+    space, visible_fraction (M,) (1 without visibility)}.
     """
     keys, cols, nrms = [], [], []
     prims = glb.world_primitives()
@@ -138,13 +145,20 @@ def voxel_observations(glb: Glb, frame: TrellisFrame, resolution: int, supersamp
         p0, p1, p2 = (pos_t[faces_t[:, k].long()] for k in range(3))
         face_n = F.normalize(torch.cross(p1 - p0, p2 - p0, dim=-1), dim=-1)
         texel_pos = dr.interpolate(pos_t[None], rast, faces_t)[0][0][mask]
+        if normals == "smooth" and all(p.normals is not None for p in group):
+            vn = torch.from_numpy(np.concatenate([frame_normals(p.normals) for p in group])).float().cuda()
+            sample_n = F.normalize(dr.interpolate(vn[None], rast, faces_t)[0][0][mask], dim=-1)
+            # keep the winding's orientation (flipped vertex normals would point inside)
+            sample_n = torch.where((sample_n * face_n[tri[mask]]).sum(-1, keepdim=True) < 0, -sample_n, sample_n)
+        else:
+            sample_n = face_n[tri[mask]]
         uv = dr.interpolate(torch.from_numpy(uvs).cuda()[None], rast, faces_t)[0][0][mask] % 1  # glTF repeat
         color = F.grid_sample(tex.permute(2, 0, 1)[None], (uv * 2 - 1)[None, None], mode="bilinear",
                               padding_mode="border", align_corners=False)[0, :, 0].T  # texel centers: exact at 1x
         ijk = ((texel_pos + 0.5) * resolution).floor().long().clamp(0, resolution - 1)
         keys.append((ijk[:, 0] * resolution + ijk[:, 1]) * resolution + ijk[:, 2])
         cols.append(color.clamp(0, 1) ** GAMMA)
-        nrms.append(face_n[tri[mask]])
+        nrms.append(sample_n)
     keys, cols, nrms = torch.cat(keys), torch.cat(cols), torch.cat(nrms)
     uniq, inv = torch.unique(keys, return_inverse=True)
     count = torch.zeros(len(uniq), device="cuda").index_add_(0, inv, torch.ones_like(keys, dtype=torch.float32))
@@ -155,13 +169,14 @@ def voxel_observations(glb: Glb, frame: TrellisFrame, resolution: int, supersamp
     keep, n = uniq[coherent], n[coherent]
     ijk = torch.stack([keep // resolution ** 2, keep // resolution % resolution, keep % resolution], -1)
     centers = (ijk.float() + 0.5) / resolution - 0.5
+    out = {"keys": keep, "colors": col[coherent], "centers": centers, "normals": n}
     if visibility:
         positions, _, faces = merge(prims, frame)
         transfer, visible = visibility_transfer(centers, n, positions, faces, resolution, vis_dirs, vis_res)
     else:
         transfer, visible = sh9(n) * SH_BAND_GAIN.cuda(), torch.ones(len(keep), device="cuda")
-    return {"keys": keep, "colors": col[coherent], "transfer": transfer, "centers": centers, "normals": n,
-            "visible_fraction": visible}
+    out.update({"transfer": transfer, "visible_fraction": visible})
+    return out
 
 
 class Rebake:
@@ -192,10 +207,12 @@ class Rebake:
         c = pbr.feats[dec_idx, PBR_LAYOUT["base_color"]].float().clamp(1e-4, 1) ** GAMMA
         T, o = self.transfer[obs_idx], self.colors[obs_idx]
         with torch.no_grad():  # per channel: min || (c_k * T) L_k - o_k ||^2
+            cd = c.detach()
             light = []
             for ch in range(3):
-                A = c[:, ch:ch + 1].detach() * T
-                light.append(torch.linalg.solve(A.T @ A + self.ridge * len(A) * torch.eye(9, device=A.device), A.T @ o[:, ch]))
+                A = cd[:, ch:ch + 1] * T
+                light.append(torch.linalg.solve(A.T @ A + self.ridge * len(A) * torch.eye(9, device=A.device),
+                                                A.T @ o[:, ch]))
             self.light = torch.stack(light, -1)  # (9, 3)
         shading = (T @ self.light).clamp(min=0)
         pred = c * shading
@@ -207,6 +224,7 @@ class Rebake:
             terms["l2d"], s2d = self.prior(pbr.feats[dec_idx], obs_idx, PBR_LAYOUT)
             stats.update(s2d)
         return terms, stats
+
 
 
 # ----------------------------------------------------------------------------------------- guided sampling
@@ -302,6 +320,7 @@ def prior_2d(args, obs, res, tag=""):
     cache = os.path.join(args.out, f"{args.prior}_prior{tag}.pt")
     key = {"input": os.path.abspath(args.input), "prior": args.prior, "resolution": res, "channels": CHANNELS,
            "views": 6 if args.prior == "supermat" else args.prior_views, "voxels": len(obs["keys"]),
+           "normals_checksum": round(float(obs["normals"].sum()), 3),
            "first_key": int(obs["keys"][0])}
     data = torch.load(cache) if os.path.isfile(cache) else None
     if data is None or data.get("key") != key:
@@ -368,6 +387,8 @@ def main():
                     help="rebake transfer without (0) / with (1) visibility; one run set per value")
     ap.add_argument("--supersample", type=int, nargs="+", default=[1],
                     help="UV rasterization density for the observations (x texture size); one run set per value")
+    ap.add_argument("--normals", nargs="+", default=["smooth"], choices=("smooth", "face"),
+                    help="normals for the rebake observations and visibility; one run set per value")
     ap.add_argument("--vis-dirs", type=int, default=256)
     ap.add_argument("--vis-res", type=int, default=2048)
     args = ap.parse_args()
@@ -392,14 +413,14 @@ def main():
 
     flow = pipeline.models[f"tex_slat_flow_model_{res}"].cuda()
     decoder = pipeline.models["tex_slat_decoder"].cuda()
-    configs = [(v, ss) for v in args.visibility for ss in args.supersample]
+    configs = [(v, ss, nm) for nm in args.normals for v in args.visibility for ss in args.supersample]
     single = len(configs) == 1
     results = {}
-    for ci, (vis, ss) in enumerate(configs):
-        tag = "" if single else f"vis{vis}_ss{ss}"
+    for ci, (vis, ss, nm) in enumerate(configs):
+        tag = "" if single else (f"vis{vis}_ss{ss}" + ("" if len(args.normals) == 1 else f"_{nm}"))
         t0 = time.time()
         obs = voxel_observations(glb, frame, res, supersample=ss, visibility=bool(vis),
-                                 vis_dirs=args.vis_dirs, vis_res=args.vis_res)
+                                 vis_dirs=args.vis_dirs, vis_res=args.vis_res, normals=nm)
         print(f"== {tag or 'observations'}: {len(obs['keys'])} observed voxels, "
               f"mean unoccluded hemisphere {obs['visible_fraction'].mean():.2f} ({time.time() - t0:.0f} s)")
         prior = prior_2d(args, obs, res, "_" + tag if tag else "") if args.prior != "none" else None
@@ -420,7 +441,7 @@ def main():
                 final_loss, final_stats = rebake(pbr)  # rebake term only (this config's observations)
             out_path = os.path.join(args.out, f"{label.replace(' ', '_')}.glb")
             write_prediction(args.input, frame, pbr, res, out_path)
-            r = {"time_s": round(time.time() - t0, 1), "visibility": vis, "supersample": ss,
+            r = {"time_s": round(time.time() - t0, 1), "visibility": vis, "supersample": ss, "normals": nm,
                  "final_rebake_loss": final_loss.item(), "final_rebake_mae": final_stats["mae"],
                  "matched": final_stats["matched"], "light_sh": rebake.light.cpu().tolist(), "history": history}
             if args.gt:

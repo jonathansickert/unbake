@@ -1,4 +1,4 @@
-# UnBake: Experiments (session of 2026-11-14)
+# UnBake: Experiments (2026-11-14)
 
 All experiments run in this session, in order. The method is described in `Method.md`.
 
@@ -261,21 +261,340 @@ Likely causes, both addressed in experiment 11:
 
 The new default is visibility on, 4× sampling, SuperMat single-view 16 views, β = 1.
 
+## 12. Smooth vs. face normals in the rebake loss (cauldron, 1024³)
+
+- **Setup:** visibility on, 4× sampling, SuperMat single-view 16 views, β = 1. The observations (and the visibility
+  and the view weighting of the prior) use either flat triangle normals or the GLB's smooth vertex normals
+  (`NORMAL`, interpolated), which Blender used to shade the bake.
+- **Motivation:** the relighting renderer and the rebake loss used flat triangle normals, so the shading model
+  could not reproduce the smooth baked shading.
+- **Files:** `output/guided/cauldron_normals_1024/`, with the image-space material figure `materials.pdf`
+  (`unbake/evaluation/material_figure.py`).
+
+UV-space MAE:
+
+| guidance | normals | base color | roughness | metallic |
+|---|---|---|---|---|
+| unguided | – | 0.0967 | 0.335 | **0.302** |
+| rebake | face | 0.0885 | 0.333 | 0.303 |
+| rebake | smooth | **0.0879** | 0.333 | 0.303 |
+| + SuperMat | face | 0.0881 | **0.155** | 0.386 |
+| + SuperMat | smooth | 0.0890 | 0.156 | 0.388 |
+| input as albedo | | 0.1088 | 0.147 | 0.566 |
+
+- No measurable difference: every change is within the run-to-run noise. Each voxel's normal is already averaged
+  over the surface it covers, and visibility matters far more than the exact normal.
+- Smooth normals are kept as the default because they match how the bake was shaded.
+- In image space, the guided base color beats both unguided and input as albedo (0.094–0.098 vs. 0.107 and
+  0.104). With the prior, roughness reaches about the constant (0.127–0.131 vs. 0.122).
+- Metallic stays at about 0.447 in image space for every method: the ground truth's whole pot body is metal, and
+  every method predicts it as non-metal.
+
+## 13. Dataset run with the current method (1024³)
+
+- **Setup:** `unbake.guided_dataset` with the defaults from `docs/Method.md`: visibility on, 4× sampling, smooth
+  normals, SuperMat single-view 16 views, β = 1, λ_r = λ_m = 1. The priors are fused in memory from the per-view
+  SuperMat predictions saved by experiment 10, so SuperMat was not run again.
+- **Run time:** 2h17 for 80 inputs, 26–180 s per input depending on the asset.
+- **Files:** predictions in `output/predictions/guided_supermat_sv_b1_1024_vis_ss4/`, evaluation in
+  `output/guided_eval/` (`compare.md`, `tables.tex`).
+- **Run history:** the first attempts failed because the home directory's disk quota filled up while writing
+  per-input prior files (up to 90 MB each at 4×). A failed write also truncated `unbake/guided_dataset.py`, which
+  was rebuilt. The driver now writes only the predictions.
+
+All 80 inputs:
+
+| method | base color MAE | base color PSNR | roughness MAE | metallic MAE | relit LPIPS ↓ | relit PSNR ↑ | relit SSIM ↑ | relit MAE ↓ |
+|---|---|---|---|---|---|---|---|---|
+| input as albedo | 0.151 | 13.30 | **0.204** | **0.238** | 0.070 | 14.42 | **0.750** | 0.165 |
+| TRELLIS.2 unguided 1024 | 0.115 | 15.87 | 0.418 | 0.435 | 0.085 | 14.09 | 0.585 | 0.172 |
+| guided, experiment 10 (no visibility, 1× sampling) | 0.117 | 15.42 | 0.302 | 0.316 | 0.077 | 14.97 | 0.681 | 0.150 |
+| **guided, current method** (visibility, 4×, smooth normals) | **0.114** | **15.99** | 0.279 | 0.321 | 0.071 | 15.55 | 0.700 | 0.141 |
+| hybrid (experiment 3) | 0.115 | 15.87 | 0.219 | 0.268 | **0.067** | **16.42** | 0.702 | **0.123** |
+
+- **Against experiment 10:** visibility and 4× sampling improve every metric except metallic.
+  - Base color 0.117 → 0.114, PSNR 15.42 → 15.99.
+  - Roughness 0.302 → 0.279.
+  - Relit PSNR 14.97 → 15.55, LPIPS 0.077 → 0.071, SSIM 0.681 → 0.700.
+
+  Metallic stays the same (0.316 → 0.321).
+- **Against unguided TRELLIS.2:** better or equal everywhere. Base color is now slightly better (0.115 → 0.114,
+  +0.12 dB), but the gain is much smaller than on the cauldron (8%), so visibility helps that asset more than the
+  average one.
+- **Against the hybrid:** its base color is as good as the hybrid's, but it trails on roughness (0.279 vs. 0.219),
+  metallic (0.321 vs. 0.268) and relighting (−0.9 dB PSNR). Steering the latent towards SuperMat's roughness and
+  metallic gets only part of the way to using SuperMat's maps directly.
+
+## 14. Ground-truth metallic statistics (dataset)
+
+Surface-area-weighted, ground-truth maps of the 10 assets:
+
+- **Metal area:** 21.6% of the surface overall (m > 0.5), very unevenly spread. Five assets are almost metal-free
+  (0–5%), and five have a lot (19–61%; the cauldron 61%).
+- **Binary values:** 76% of the surface is below 0.1 or above 0.9. Two assets (796f, a7da) have many in-between
+  artist values.
+- **MAE of simple predictions:** constant 0: 0.238; constant 0.5: 0.409; the ground truth thresholded at 0.5 (a
+  perfect metal / non-metal decision): 0.091.
+
+Metallic is mainly a metal / non-metal decision. Grey predictions are never optimal under MAE when the true value
+is 0 or 1; the more likely of 0 and 1 is. Getting the decision right per part would cut the error by about 60%.
+
+## 15. The current method on a specular bake (cauldron, 1024³)
+
+- **Data:** `examples/cauldron_specular.glb`, baked with `data_toolkit/bake_multiview.py`: 32 path-traced views
+  (128 samples) blended per texel with weights cos⁴(view, normal), monkstown_castle at 267.5°. Texels no camera saw
+  (15.4%) fall back to the diffuse bake. The specular bake changes the texture by 66% of the diffuse brightness
+  (linear color); the metal parts (61% of the surface) are 0.59× as bright as in the diffuse bake, the non-metal parts
+  unchanged (0.99×).
+- **Setup:** current method (visibility, 4× sampling, smooth normals, SuperMat 16 views, β = 1).
+- **Files:** `output/guided/cauldron_specular_1024/`.
+
+| | base color MAE | roughness MAE | metallic MAE |
+|---|---|---|---|
+| input as albedo | 0.1072 | 0.147 | 0.566 |
+| unguided | **0.0953** | 0.267 | **0.344** |
+| rebake (diffuse model) | 0.1098 | 0.270 | 0.345 |
+| + SuperMat (roughness + metallic) | 0.1107 | **0.141** | 0.425 |
+
+- **Base color:** the diffuse rebake model now makes it worse (on the diffuse bake it made it better). The metal parts
+  follow a different image formation, which biases the shared lighting fit; the error grows most on the non-metal
+  parts (0.147 → 0.179).
+- **SuperMat on specular renders:** roughness beats the constant for the first time (0.141 vs. 0.147), but metallic gets
+  much worse: SuperMat reads the dark, reflective metal as non-metal (predicted metallic on metal parts 0.41 → 0.24).
+
+## 16. Specular rebake term (Cook-Torrance GGX) on the specular cauldron
+
+- **Model** (`unbake/specular.py`, `--specular 1`): metallic-roughness Cook-Torrance (GGX, Smith, Schlick split into an
+  F0 part and a white part) under SH lighting, the viewing direction averaged over p(ω_o) ∝ cos⁴ (the bake's view
+  blending), per-band lobe gains (Funk–Hecke) tabulated over roughness; diffuse transfer with visibility, scalar
+  specular occlusion; clipped texels dropped. Lighting still linear, fitted by least squares on the detached materials.
+- **Setup:** order-4 SH, view-blended, SuperMat prior on roughness only (λ_m = 0), β = 1.
+- **Files:** `output/guided/cauldron_specular_model_1024/` (with `relit/` from `unbake/evaluation/relit_glbs.py`),
+  `output/guided/cauldron_specular_sh8/`.
+
+| rebake model | guidance | base color | roughness | metallic | relit LPIPS ↓ | relit PSNR ↑ | relit SSIM ↑ |
+|---|---|---|---|---|---|---|---|
+| – | unguided | **0.0953** | 0.267 | 0.344 | 0.101 | **15.98** | 0.697 |
+| diffuse | rebake | 0.1099 | 0.270 | 0.345 | 0.124 | 13.80 | 0.678 |
+| diffuse | + SuperMat roughness | 0.1108 | **0.136** | **0.340** | 0.104 | 15.12 | 0.728 |
+| specular | rebake | 0.1004 | 0.269 | 0.345 | 0.115 | 14.82 | 0.672 |
+| specular | + SuperMat roughness | 0.1000 | 0.137 | 0.341 | 0.100 | 15.90 | 0.714 |
+| | input as albedo | 0.1072 | 0.147 | 0.566 | **0.081** | 15.94 | **0.731** |
+
+- The specular term removes about two-thirds of the base-color damage (0.1099 → 0.1004) and gains +1.0 dB relit PSNR
+  alone, +0.8 dB with the roughness prior. On the metal parts base color now beats unguided (0.059 vs. 0.062).
+- Roughness and metallic are not moved by the rebake term itself (0.269 / 0.345, as unguided); only the roughness prior
+  improves roughness.
+- Order-8 SH gives the same results as order 4 (base color 0.0999, roughness 0.139, metallic 0.340).
+
+## 17. Ground-truth model check of the specular term
+
+`unbake/evaluation/model_check.py`: the rebake loss (×1e-4) with the ground-truth materials against perturbations. The
+term can only guide roughness / metallic correctly if the ground truth has the lowest loss.
+
+| setting (specular cauldron, view-blended) | GT | metal parts → non-metal | non-metal → metal | r −0.2 | r +0.2 |
+|---|---|---|---|---|---|
+| order-4 SH, fitted lighting | 12.21 | **11.16** | 14.61 | 12.24 | 12.84 |
+| order-8 SH, fitted lighting | 12.04 | **10.97** | 14.61 | 12.07 | 12.66 |
+| 64 spherical Gaussians, fitted lighting | 12.75 | **11.92** | 14.70 | **12.61** | 13.51 |
+| order-8 SH + energy compensation | 11.83 | **11.03** | 14.75 | 12.06 | **11.67** |
+| order-4 SH, fallback texels excluded | 13.68 | **12.47** | 16.40 | 13.72 | 14.37 |
+| order-4 SH, true lighting (env map, fitted scale) | 13.05 | **12.78** | 14.33 | 13.24 | 13.61 |
+| order-4 SH, true lighting, emissive voxels excluded | 7.39 | **6.71** | 7.29 | 7.25 | 8.08 |
+
+- No setting passes: the metal parts always score better as non-metal.
+- **More detailed lighting** (higher SH order) fits slightly better but does not change the ranking. **Spherical
+  Gaussians** fit worse and also rank roughness wrong; **energy compensation** (multiple-scattering GGX) pushes
+  roughness too high. Both were removed from the code.
+- **Fallback texels:** the bake's camera rig was replicated (`unbake/bake_views.py`): 14.9% unseen texels vs. the
+  reported 15.4%. Excluding them does not remove the bias.
+- **True lighting:** the environment map projected into SH with the bake's rotation fits the matching diffuse bake as
+  well as fitted lighting (19.6 vs. 19.4, with a constant per-channel scale of 0.5); on the specular bake the metal bias
+  shrinks from ~9% to ~2%, so fitted lighting exaggerates it.
+- **Emission is the main cause:** `cauldron_pbr.glb` has an emissive texture on 9.4% of the surface (fire, liquid).
+  The path-traced bake contains their glow and the warm light they cast on the base and the pot. A distant-lighting
+  model cannot explain either; excluding the emissive voxels halves the unexplained loss (13.1 → 7.4), but their light
+  on the neighbours still breaks the ranking. Since real scans contain emission too, the model has to handle it
+  (emitter detection and local lights; not implemented).
+
+## 18. Robust lighting fit (cauldron, 1024³)
+
+- **Setup:** lighting fitted by iteratively reweighted least squares (Geman–McClure, 4 iterations, scale from the
+  median absolute deviation), optionally also weighting the rebake loss (`--robust fit|fit+loss`).
+- **Files:** `output/guided/robust_*`.
+
+| base color MAE | no robustness | robust fit | robust fit + loss |
+|---|---|---|---|
+| diffuse cauldron, current method | **0.0890** | 0.0927 | 0.0988 |
+| specular cauldron, specular model + roughness prior | **0.0998** | 0.1018 | 0.1039 |
+
+The robust fit makes base color worse in every case (roughness and metallic unchanged) and does not fix the metallic
+ranking of experiment 17 either. Down-weighting the worst-explained voxels also removes the ones that constrain the
+lighting most (e.g. shadowed regions). It stays off.
+
+## 19. Detail recovery (cauldron, 1024³)
+
+- **Method** (`unbake/detail.py`, `docs/Method.md` Sec. 8.1): per texel of the baked texture, order-2 SH transfer
+  with visibility, robust lighting fit against the prediction's base color, shading-normalized albedo D = o / shading;
+  only D's high frequencies are transferred: c = c_pred · clamp(D / blur_σ(D), 0.5, 2), blur restricted to the UV
+  islands. About 5 s per asset.
+- **Input:** the current method's prediction on the diffuse cauldron (experiment 12, smooth normals).
+- **Files:** `output/guided/detail_cauldron/` (before / after figures in `before_after/`).
+
+| | base color MAE | relit LPIPS ↓ | relit PSNR ↑ | relit SSIM ↑ | relit MAE ↓ |
+|---|---|---|---|---|---|
+| input as albedo | 0.1088 | **0.085** | 14.34 | 0.727 | 0.151 |
+| guided, before | 0.0890 | 0.101 | **15.19** | 0.718 | 0.124 |
+| + detail, σ = 2 | 0.0891 | 0.087 | 15.15 | **0.748** | **0.123** |
+| + detail, σ = 4 | 0.0898 | 0.089 | 15.07 | 0.739 | 0.123 |
+| + detail, σ = 8 | 0.0918 | 0.093 | 14.90 | 0.731 | 0.125 |
+| + detail, σ = 4, factor clamped to 1.5 | **0.0885** | 0.089 | 15.13 | 0.740 | 0.123 |
+| full division (D, no high-pass) | 0.1577 | 0.138 | 12.50 | 0.713 | 0.165 |
+
+- σ = 2 is best: relit SSIM above input as albedo for the first time (0.748 vs. 0.727), LPIPS almost level (0.087 vs.
+  0.085), base color MAE and relit PSNR unchanged. The relief, brick edges and wood grain are back in the renders.
+- The full division is much worse: D's low frequencies still contain the shading the model does not explain
+  (emitter light, interreflections), so only the high-frequency transfer works.
+
+## 20. Dataset: detail recovery, smooth-normal relighting (1024³)
+
+- **Setup:** detail recovery (σ = 2) applied to the 80 predictions of experiment 13 and, for a fair comparison, to the
+  hybrid of experiment 3 (its base color is unguided TRELLIS.2, equally blurred). Relighting renders now shade with the
+  GLBs' smooth vertex normals instead of the renderer's flat face normals (`render_mesh(..., smooth_normals=True)`).
+- **Files:** predictions in `output/predictions/{guided_supermat_sv_b1_1024_vis_ss4_detail, hybrid_detail}/`,
+  evaluation in `output/guided_eval/eval_smooth/`, table in `output/guided_eval/compare_smooth.md` and `tables_smooth.tex`.
+
+All 80 inputs:
+
+| method | base color MAE | base color PSNR | roughness MAE | metallic MAE | relit LPIPS ↓ | relit PSNR ↑ | relit SSIM ↑ | relit MAE ↓ |
+|---|---|---|---|---|---|---|---|---|
+| input as albedo | 0.151 | 13.30 | **0.204** | **0.238** | 0.070 | 14.44 | **0.749** | 0.164 |
+| TRELLIS.2 unguided 1024 | 0.115 | 15.87 | 0.418 | 0.435 | 0.085 | 14.08 | 0.585 | 0.172 |
+| guided, experiment 10 (no visibility) | 0.117 | 15.42 | 0.302 | 0.316 | 0.077 | 14.96 | 0.680 | 0.150 |
+| guided, current method (experiment 13) | 0.114 | 15.99 | 0.279 | 0.321 | 0.071 | 15.53 | 0.700 | 0.141 |
+| **guided + detail recovery** | **0.108** | **16.24** | 0.279 | 0.321 | 0.070 | 15.56 | 0.716 | 0.141 |
+| hybrid | 0.115 | 15.87 | 0.219 | 0.268 | 0.067 | 16.42 | 0.702 | 0.123 |
+| **hybrid + detail recovery** | 0.109 | 16.18 | 0.219 | 0.268 | **0.066** | **16.51** | 0.730 | **0.121** |
+
+- **Detail recovery improves base color, not only relighting:** guided 0.114 → 0.108 (+0.25 dB), hybrid 0.115 → 0.109.
+  Guided + detail has the best base color of all methods: 6% better than unguided TRELLIS.2, 28% better than input as
+  albedo. Relit SSIM rises by 0.016 (guided) and 0.028 (hybrid); LPIPS improves slightly; PSNR is unchanged.
+- **Relighting is still led by the hybrid** (with detail: LPIPS 0.066, PSNR 16.51 dB, SSIM 0.730). Its advantage is now
+  entirely roughness and metallic (0.219 / 0.268 vs. 0.279 / 0.321). Input as albedo keeps the best SSIM (0.749).
+- **Smooth normals** change the dataset numbers by at most ±0.02 dB for every method; earlier conclusions stand.
+
+## 21. SAM parts: part-level roughness / metallic (cauldron, then dataset)
+
+- **Method** (`unbake/evaluation/part_metrics.py`, dataset driver `part_metrics_dataset.py`): SAM ViT-H automatic
+  masks on 16 unlit Fibonacci renders (1024²) of the baked input; each pixel takes the smallest covering mask. Texels
+  of every UV atlas are projected into the views (depth test, cos > 0.1) and pick up the mask id. Neighbouring texels
+  are joined when the views seeing both agree more often than not; components are merged across seams / materials by
+  the same vote on their majority mask; small and unseen pieces go to the nearest part. Metrics: surface-area-weighted
+  MAE per texel, and after replacing every texel by its part's weighted median ("part-constant"). Oracle: the ground
+  truth itself made part-constant. About 2 min per input (SAM ≈ 7 s per view).
+- **Also scored:** "SuperMat 16 views, fused", the guidance target itself (the saved per-view SuperMat single-view
+  predictions of experiment 10, fused with the prior's cos² weighting directly into texels instead of voxels).
+  SuperMat's own baseline folder is a broken symlink, so "SuperMat / hybrid" is read from the hybrid predictions,
+  whose roughness / metallic are SuperMat's maps unchanged.
+- **Files:** `output/parts/cauldron/`, `output/parts/dataset/` (`part_metrics.md`, per input `report.json`,
+  `sam_views.png`, `parts_sam.png`).
+
+**Cauldron** (`examples/`, 25 parts, 14 cover 90% of the area; oracle roughness 0.015, metallic 0.026), roughness MAE:
+
+| method | texel | SAM part median |
+|---|---|---|
+| constant 0.5 | 0.147 | 0.147 |
+| unguided | 0.335 | 0.336 |
+| rebake | 0.333 | 0.334 |
+| guided (rebake + SuperMat) | 0.156 | **0.112** |
+| SuperMat 16 views, fused | 0.166 | 0.148 |
+
+**Dataset, first lighting of each of the 10 assets** (10 inputs; 21.7 parts on average, 11.6 cover 90% of the area;
+84% of texels seen by a view):
+
+| method | roughness texel | roughness SAM parts | metallic texel | metallic SAM parts |
+|---|---|---|---|---|
+| constant (r 0.5, m 0) | 0.204 | 0.204 | 0.238 | 0.238 |
+| TRELLIS.2 unguided 1024 | 0.416 | 0.419 | 0.448 | 0.452 |
+| SuperMat / hybrid | 0.255 | 0.246 | 0.252 | 0.247 |
+| guided (experiment 13) | 0.286 | 0.290 | 0.351 | 0.364 |
+| **SuperMat 16 views, fused** | 0.190 | **0.177** | **0.217** | **0.217** |
+| *oracle (ground truth part-constant)* | | *0.069* | | *0.043* |
+
+- **The cauldron gain does not generalize.** Part medians help the guided result only on the cauldron (0.156 → 0.113)
+  and 69669054 (0.320 → 0.288); on average it gets slightly worse (0.286 → 0.290). On the cauldron the ground truth is
+  almost exactly constant per SAM part (oracle 0.015); on four assets the oracle is 0.10–0.14, i.e. SAM's parts mix
+  roughness values.
+- **The guidance target beats the constants dataset-wide**, the first prediction to do so: fused 16-view SuperMat
+  roughness 0.190 (0.177 with parts) vs. 0.204, metallic 0.217 vs. 0.238. The guided method, steered towards exactly
+  this target, ends at 0.286 / 0.351: guiding the latent loses most of the prior's information. It is also clearly
+  better than SuperMat's own multi-view baseline (0.255 / 0.252).
+- **"Ground-truth regions"** (connected regions of quantized ground truth) fragments into ~86k regions on the textured
+  ground truths, so it is effectively per texel and not a useful reference; ignore that column in `part_metrics.md`.
+- **Next:** guided base color (with detail) + fused 16-view SuperMat roughness / metallic written directly into the UV
+  layout, with part medians for roughness as an option. Confirm on all 80 inputs.
+
+## 22. Hybrid with the fused 2D prior: guided base color + fused SuperMat 16-view roughness / metallic (dataset)
+
+- **Method** (`unbake/hybrid_prior.py`): base color from the guided predictions of experiment 13 (with and without
+  detail recovery, experiment 20); roughness / metallic from the saved per-view SuperMat single-view predictions
+  (16 Fibonacci views, experiment 10) fused per texel of every material with the prior's cos² weighting and depth test,
+  unseen texels from the nearest seen texel. No SAM, no part medians. About 4 s per input.
+- **Files:** predictions in `output/predictions/{guided+sm16_rm, guided_detail+sm16_rm}/`, evaluation in
+  `output/hybrid_prior_eval/eval/` (smooth-normal relighting as in experiment 20; input as albedo reproduces
+  experiment 20 exactly).
+
+All 80 inputs (rows other than the two new ones from experiment 20):
+
+| method | base color MAE | roughness MAE | metallic MAE | relit LPIPS ↓ | relit PSNR ↑ | relit SSIM ↑ | relit MAE ↓ |
+|---|---|---|---|---|---|---|---|
+| input as albedo | 0.151 | 0.204 | 0.238 | 0.070 | 14.44 | 0.749 | 0.164 |
+| guided + detail (experiment 20) | 0.108 | 0.279 | 0.321 | 0.070 | 15.56 | 0.716 | 0.141 |
+| hybrid + detail (experiment 20) | 0.109 | 0.219 | 0.268 | 0.066 | 16.51 | 0.730 | 0.121 |
+| guided base color + fused r/m | 0.114 | **0.186** | **0.234** | 0.064 | 16.75 | 0.750 | 0.125 |
+| **guided base color + detail + fused r/m** | **0.108** | **0.186** | **0.234** | **0.062** | **16.81** | **0.767** | 0.124 |
+
+- **First method that is best or tied on every UV metric and on relit LPIPS, PSNR and SSIM**, including SSIM above
+  input as albedo (0.767 vs. 0.749). Relit MAE is about level with the hybrid (0.124 vs. 0.121).
+- **Roughness** beats the constant 0.5 dataset-wide (0.186 vs. 0.204; better on 50 of 80 inputs) and the hybrid's
+  SuperMat maps (0.219; 49 of 80).
+- **Metallic** only ties the constant 0 (0.234 vs. 0.238, better on 39 of 80). It helps on the metal-heavy assets
+  (e.g. a7da 0.684 → 0.391, cauldron 0.566 → 0.443) and hurts on the metal-free ones, where 0 is nearly perfect
+  (e.g. 6966 0.038 → 0.221, afd3 0.030 → 0.176): grey in-between values instead of a metal / non-metal decision
+  (experiment 14).
+- **Against hybrid + detail, per input:** relit PSNR +0.30 dB on average but better on only 42 of 80 inputs; roughness
+  better on 49, metallic on 52.
+- Guidance is thus useful for base color, while roughness / metallic are best taken from the fused 2D prior directly
+  (experiment 21).
+
 ---
 
 ## Summary and open items
 
-- **Base color:** guidance only helps with visibility in the rebake loss (cauldron: 0.0967 → 0.0882). This
-  still has to be confirmed on the dataset. `unbake/guided_dataset.py` does not yet pass visibility and the 4×
-  sampling through, and the 80 priors need re-fusing for the denser observations.
-- **Roughness:** the 2D prior helps a lot, if enough voxels are observed (4× sampling) and the gradients are
-  normalized separately. On the cauldron it reaches about the constant baseline.
-- **Metallic:** inconclusive. It helped at 512³ on the cauldron and SuperMat's metallic is good dataset-wide, but
-  it got worse at 1024³ on the cauldron. To be decided on the dataset, with λ_metallic = 0 as the fallback.
-- **The baseline to beat** is the hybrid (relit PSNR 16.42 dB on the dataset); the guided method without
-  visibility reached 14.97 dB.
+- **Base color:** guidance with visibility, plus detail recovery, gives the best base color of all methods on the
+  dataset (0.108 vs. 0.115 for unguided TRELLIS.2 and 0.151 for input as albedo). Detail recovery also raises relit
+  SSIM for every method it is applied to. Smooth vs. face normals makes no measurable difference, in the rebake loss
+  or in the relighting evaluation.
+- **Roughness:** the 2D prior helps a lot (dataset: 0.418 → 0.279), but guiding the latent towards SuperMat gets only
+  part of the way: SuperMat's maps used directly are better (0.219), and the constant 0.5 is better still (0.204).
+- **Metallic:** unsolved. Guidance improves it over TRELLIS.2 (0.435 → 0.321), but nothing beats the constant 0
+  (0.238). It is a metal / non-metal decision (experiment 14).
+- **Relighting:** led by the hybrid with detail recovery (16.51 dB); the guided method with detail reaches 15.56 dB,
+  the gap being roughness and metallic. Obvious next step: guided base color with detail + SuperMat's roughness /
+  metallic maps.
+- **Specular bakes:** the specular rebake term fixes most of the base-color damage the diffuse model causes, but does
+  not yet recover metallic: emission (glow and local light from emitters) cannot be explained by distant lighting, and
+  real scans contain it too. Model-side fix proposed (emitter detection by an albedo ≤ 1 bound, emitters as local lights
+  fitted jointly with the environment); not implemented. A robust lighting fit does not help (experiment 18).
+- **Diffuse bake pipeline, suggested changes:** more samples or denoising (Monte Carlo noise is baked in and detail
+  recovery transfers it), consistent use of the normal map in bake and evaluation, exposure headroom and HDR storage,
+  emission in the bake for realism.
 - **Missing files:** `output/predictions/{supermat, trellis_unguided_512, material_anything, rgbx}` and `output/rgbx/`
   were removed during the session, by something other than these experiments. They are needed to re-score those
-  baselines and to rebuild the hybrid (`output/hybrid_test/predictions/supermat` is now a broken link).
-- **Weights in `/tmp`** (RGB↔X, SuperMat checkpoints, Hugging Face cache) were wiped by the container restart and
-  must be re-downloaded for new RGB↔X / SuperMat runs.
+  baselines; the hybrid predictions in `output/hybrid_test/` still exist.
+- **Removed to free disk space** (all regenerable): two partial dataset runs without predictions, cached prior `.pt`
+  files in `output/guided/*` and of experiment 10.
+- **Disk quota:** the home directory is at its limit (about 72 GB, mostly `~/public`). Runs must not write large
+  intermediates.
+- **Weights in `/tmp`** (RGB↔X, SuperMat checkpoints, Hugging Face cache) are wiped by container restarts and must be
+  re-downloaded.

@@ -1,7 +1,14 @@
 # UnBake: dataset, baselines and evaluation
 
-Everything runs from the repository root as modules (`python -m unbake....`), so `trellis2` and
-`unbake` are importable without path setup.
+Install the repo once, editable, into the environment that has the TRELLIS.2 dependencies:
+
+```sh
+pip install --no-deps --no-build-isolation -e .     # unbake + trellis2, from the repo root
+```
+
+Then every script runs from any directory, by path (`python unbake/evaluation/compare.py`) or as a
+module (`python -m unbake.evaluation.compare`). Default paths (`data/`, `output/`, `env_maps/`)
+always point into the repository (`unbake/paths.py`).
 
 ```
 unbake/
@@ -11,16 +18,26 @@ unbake/
   uv_bake.py            TRELLIS.2 space (TrellisFrame), per-voxel materials -> original UV layout
   reference.py          unlit render of a baked asset (conditioning image)
   predictions.py        prediction layout and method registry (see below)
+  paths.py              default locations (data/, output/, env_maps/)
+  guided_trellis2.py    UnBake on one asset: rebake-guided TRELLIS.2 sampling (docs/Method.md)
+  guided_dataset.py     UnBake on a whole dataset
+  prior2d.py            2D roughness / metallic prior: SuperMat / RGB<->X on N views, fused per voxel
+  detail.py             detail recovery: high frequencies of the shading-normalized input into the base color
+  hybrid_prior.py       base color of one prediction + 16-view SuperMat roughness / metallic fused per texel
   baselines/            one script per baseline; all write the prediction layout
     common.py           shared by the baselines: trimesh helpers, textured.glb writer
     unguided_trellis2.py, supermat.py, material_anything.py, rgbx.py
+    hybrid.py           hybrid baseline: TRELLIS.2 base color + SuperMat roughness / metallic
     patches/            patch for the Material Anything repo
-    results/            metrics of the first baseline runs (old protocol, see below)
   evaluation/
     metrics.py          UV-space material metrics, image metrics
     render.py           relighting renders (TRELLIS.2 PBR renderer, env maps, held-out cameras)
     summary.py          shared by the evaluation scripts: arguments, summaries, printed tables
-    evaluate_uv.py, evaluate_relit.py, compare.py, seeds.py, figure.py
+    evaluate_uv.py, evaluate_relit.py, compare.py, seeds.py, figure.py, uv_figure.py
+    material_figure.py  material maps of every method in image space
+    relit_glbs.py       relighting metrics and figure for explicit GLBs (e.g. the examples/ cauldron)
+    part_metrics.py     SAM part segmentation of a baked asset, part-level roughness / metallic metrics
+    part_metrics_dataset.py   the same over a dataset
   run_eval.sh           unguided TRELLIS.2 at 512 and 1024, both evaluations, tables
 ```
 
@@ -52,9 +69,10 @@ color, roughness 0.5, metallic 0) is always included.
 |---|---|
 | `evaluation.evaluate_uv` | Material accuracy in UV space: surface-area-weighted MAE / PSNR of base color, roughness and metallic against `pbr.glb`. Predictions are matched to the ground truth face by face (mesh names, order and material numbering may differ; a different UV layout is an error). |
 | `evaluation.evaluate_relit` | Relighting: prediction and ground truth rendered under the held-out env maps in `env_maps/eval/` (not used to create the dataset, scaled to the same mean luminance), 8 held-out views; LPIPS on the full frame, PSNR / SSIM / MAE on object pixels. Saves all renders. |
-| `evaluation.compare` | Markdown table and the LaTeX tables of all methods, on the inputs every method has. |
+| `evaluation.compare` | Markdown table and the LaTeX tables, on the inputs every method has (`--methods` restricts the methods, `--label-suffix` changes the LaTeX labels). |
 | `evaluation.seeds` | Mean ± std over runs of one method (e.g. seeds). |
 | `evaluation.figure` | Qualitative figure from the renders of `evaluate_relit`. |
+| `evaluation.uv_figure` | Material maps of one asset side by side, in the ground truth's UV layout. |
 
 Both evaluations write one record per (item, lighting, method) and a summary to
 `output/eval/metrics_uv.json` / `metrics_relit.json`; missing predictions are skipped and reported.
@@ -66,21 +84,15 @@ The renderer's SSAO samples are seeded per view, so relit renders and metrics ar
 unbake/run_eval.sh                                                   # TRELLIS.2 512 + 1024, evaluation, tables
 python -m unbake.baselines.supermat --sm-dir ... --ckpt-dir ...      # 2D baselines -> output/predictions/<method>
 python -m unbake.baselines.material_anything --ma-dir ... --ma-python ...
-python -m unbake.baselines.rgbx --rgbx-dir ...
+python -m unbake.baselines.rgbx --weights /tmp/rgb-to-x            # code: rgbx/ submodule
 python -m unbake.evaluation.evaluate_uv && python -m unbake.evaluation.evaluate_relit
-python -m unbake.evaluation.compare --latex output/tables.tex
-python -m unbake.evaluation.figure --out output/figure.png
+python -m unbake.evaluation.compare --all --latex output/tables.tex   # every method on all of its inputs
+python -m unbake.evaluation.compare --label-suffix=-subset --latex output/tables_subset.tex   # 20 inputs of Material Anything
+python -m unbake.evaluation.figure && python -m unbake.evaluation.uv_figure
 ```
 
 Seeds: `python -m unbake.baselines.unguided_trellis2 --seed 0` writes `trellis_unguided_1024_s0`;
 after the evaluation, `python -m unbake.evaluation.seeds "TRELLIS.2 (unguided, 1024)" trellis_unguided_1024_s0 ...`.
-
-## `baselines/results/`
-
-These JSON files were computed with the first version of the evaluation (the `env_maps/`
-lighting minus the bake map, 4 views, texel-weighted UV error, SSIM on the full frame, unguided
-TRELLIS.2 conditioned on the yaw-0 render). They are not comparable to the current evaluation;
-rerun the methods' predictions through `evaluate_uv` / `evaluate_relit`.
 
 ## Notes
 
@@ -94,7 +106,8 @@ rerun the methods' predictions through `evaluate_uv` / `evaluate_relit`.
 - `opencv-python-headless` 4.x (tested 4.11.0.86).
 - xformers 0.0.31 on Blackwell (sm_120) dispatches to its Hopper-only FlashAttention-3 kernel;
   `unguided_trellis2` turns it off.
-- Build the CUDA extensions for your GPU (`TORCH_CUDA_ARCH_LIST`, see `INSTALL.md`).
+- Build the CUDA extensions for your GPU: set `TORCH_CUDA_ARCH_LIST` to its compute capability
+  (`nvidia-smi --query-gpu=compute_cap --format=csv`).
 - Gated weights: `facebook/dinov3-vitl16-pretrain-lvd1689m` and `briaai/RMBG-2.0`.
 
 ## Speed

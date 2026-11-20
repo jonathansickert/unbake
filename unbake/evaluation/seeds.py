@@ -7,17 +7,19 @@ Mean +- std over runs of one method (e.g. seeds: unbake.baselines.unguided_trell
 Each run is summarized on the (item, lighting) inputs that all given runs have, as in compare.py.
 """
 import argparse
+import os
 
 import numpy as np
 
 from unbake.evaluation.compare import RELIT_COLS, UV_COLS, load
 from unbake.evaluation.summary import summaries
+from unbake.paths import OUTPUT
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("runs", nargs="+", help="method names of the runs (as in the metrics files)")
-    ap.add_argument("--eval", default="output/eval", help="folder with metrics_uv.json and metrics_relit.json")
+    ap.add_argument("--eval", default=os.path.join(OUTPUT, "eval"), help="folder with metrics_uv.json and metrics_relit.json")
     args = ap.parse_args()
 
     records, methods, _ = load(args.eval)

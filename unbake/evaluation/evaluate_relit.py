@@ -14,7 +14,6 @@ Writes to --output:
     renders/<item>/<method>/<lighting>.png        rows = env maps, columns = views
 """
 import argparse
-import glob
 import json
 import os
 import re
@@ -25,17 +24,11 @@ import torch
 from PIL import Image
 
 from unbake.evaluation.metrics import RenderMetrics
-from unbake.evaluation.render import held_out_cameras, load_envmap, render_mesh, render_views
+from unbake.evaluation.render import (ENV_MAP_MEAN_LUMINANCE, EVAL_ENV_MAPS, NUM_VIEWS, RESOLUTION,
+                                      held_out_cameras, load_envmap, render_mesh, render_views)
 from unbake.evaluation.summary import add_eval_args, evaluation_inputs, report_all
 from unbake.gltf_io import Glb
 from unbake.uv_bake import TrellisFrame
-
-EVAL_ENV_MAPS = sorted(glob.glob("env_maps/eval/*.exr"))
-# Every eval env map is scaled to this mean luminance, so a dim map (e.g. a night sky) does not
-# render nearly black and hide material errors. None keeps each map's own brightness.
-ENV_MAP_MEAN_LUMINANCE = 1.0
-NUM_VIEWS = 8
-RESOLUTION = 512
 
 parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
 add_eval_args(parser)

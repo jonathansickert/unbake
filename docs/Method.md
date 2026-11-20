@@ -213,6 +213,33 @@ empty neighbors do not darken the result. UV islands are padded by 8 px. The map
 the input glTF as a metallic-roughness material (`KHR_materials_unlit` removed), so geometry and UV layout are
 unchanged.
 
+### 8.1 Detail recovery
+
+The voxel prior blurs everything smaller than a voxel, while the baked input texture still has that detail,
+multiplied by baked shading. A post-process (`unbake/detail.py`, about 5 s per asset) puts it back into the base
+color, using only the input and the prediction. For every texel of each material's baked texture (its own
+resolution):
+
+1. **Shading model per texel:** the surface point and the smooth vertex normal (UV rasterization), and the order-2
+   SH transfer of the cosine-weighted visibility $t_j$ (the same shadow maps as Sec. 4).
+2. **Lighting:** $L$ ($9 \times 3$) fitted to the observed texels with the prediction's base color $c^\text{pred}$
+   (linear), $o_j \approx c^\text{pred}_j \odot (t_j^\top L)$. Robust per-channel least squares: 4 iterations
+   reweighted with Geman–McClure weights, scale $2.5 \cdot 1.4826 \cdot \text{MAD}$.
+3. **Shading-normalized albedo:** $D_j = o_j / \max(t_j^\top L, 10^{-3})$.
+4. **Keep only its high frequencies.** $D$'s large-scale structure contains whatever shading the model misses
+   (interreflections, local emitters, the baked normal map's low frequencies), so only the detail ratio is
+   transferred:
+   $$c_j = c^\text{pred}_j \odot \text{clamp}\!\left(\frac{D_j}{\text{blur}_\sigma(D)_j},\ \tfrac{1}{f},\ f\right),
+     \qquad \sigma = 2 \text{ texels},\ f = 2.$$
+   The Gaussian blur is restricted to the UV islands (normalized convolution with the island mask), so detail does
+   not bleed across seams.
+
+Roughness and metallic are unchanged. Using $D$ itself instead of the detail ratio is much worse on the cauldron
+(base color MAE 0.158 vs. 0.089): its low frequencies are not reliable. Larger $\sigma$ transfers more of the
+residual shading (σ = 2 / 4 / 8: relit SSIM 0.748 / 0.739 / 0.731). On the cauldron, detail recovery raises relit
+SSIM from 0.718 to 0.748 and lowers LPIPS from 0.101 to 0.087, with base color MAE and relit PSNR unchanged
+(docs/Experiments.md).
+
 ---
 
 ## 9. Default settings
@@ -228,20 +255,32 @@ unchanged.
 | fusion | $\cos^2$ weights, $\cos > 0.1$, depth tolerance $0.01$, ≥ 2 views, $\tau$ = median $\sigma$ |
 | guidance | steps with $t \le 0.8$ (6 of 12), $J = 3$, $\eta = 0.05$, $\beta = 1$ |
 | sampler | TRELLIS.2 defaults: 12 steps, rescale 3, no CFG, seed 42 |
+| detail recovery | per texel, order-2 SH with visibility, robust lighting fit, high-pass σ = 2 texels, factor clamped to [0.5, 2] |
 
 CLI: `python -m unbake.guided_trellis2 --input <baked.glb> [--gt <pbr.glb>] --out <dir> --resolution 1024
 --prior supermat_sv --sm-dir <SuperMat clone> --betas 1 --visibility 1 --supersample 4`.
 The script's own defaults are older (512, RGB↔X, no visibility, $s = 1$, $\beta \in \{0.01, 0.1\}$) and are
 kept for reproducing earlier runs.
 
-**Implementation status.** `unbake/guided_dataset.py` still calls `voxel_observations` with its defaults (no
-visibility, $s = 1$). The 1024³ dataset run in `output/predictions/guided_supermat_sv_b1_1024/` therefore uses
-the rebake loss without visibility. Running the dataset with this method needs the two options passed through
-and the priors re-fused for the denser observations.
+**Implementation status.** `unbake/guided_dataset.py` uses these defaults (1024³, visibility, $s = 4$, smooth
+normals, SuperMat single-view 16 views, $\beta = 1$). It fuses each prior in memory from saved per-view SuperMat
+predictions, so apart from the predictions nothing large is written. The dataset results are in
+`output/predictions/guided_supermat_sv_b1_1024_vis_ss4/` (docs/Experiments.md, experiment 13).
+
+**Normals.** The observations, visibility and the prior's view weighting use the mesh's smooth vertex normals
+(glTF `NORMAL`, interpolated and oriented consistently with the triangle winding), falling back to flat triangle
+normals when a primitive has none. On the cauldron the choice made no measurable difference (experiment 12).
+
+**Detail recovery** runs as a separate pass on the predictions (`python -m unbake.detail --input <baked.glb>
+--pred <prediction.glb> --out <out.glb> --sigma 2`).
+
+**Evaluation renders** (relighting metrics and figures) shade with the GLBs' smooth vertex normals
+(`unbake.evaluation.render.render_mesh(..., smooth_normals=True)`, the default), as the bakes were shaded, instead of
+the renderer's flat face normals. Normal and occlusion maps are still not used, for all methods alike.
 
 **Run time** (1024³, 24 GB MIG slice of an RTX PRO 6000): about 2.5 min per input for guided sampling, 1–2 s for
-visibility, about 20 s for the 16 SuperMat predictions (once the model is loaded), and about 1 min to load the
-models.
+visibility, about 20 s for the 16 SuperMat predictions (once the model is loaded), about 5 s for detail recovery,
+and about 1 min to load the models.
 
 ---
 
@@ -258,6 +297,8 @@ models.
 | meaning of $\beta$ | loss weight | share of the 2D prior in each normalized step |
 | schedule | "selected steps" | $t \le 0.8$ |
 | re-interpolation | $x(t) \leftarrow (1 - t)\hat x_0 + t\hat\epsilon$ | same with $\sigma_\text{min}$, directly at $t_\text{prev}$ |
+| fine detail | "recover fine texture details by dividing the input texture by the estimated lighting" (next step) | implemented, high-pass detail transfer (Sec. 8.1) |
+| relighting evaluation | flat face normals | smooth vertex normals |
 
 Unchanged: Lambertian SH model with closed-form lighting fit, Huber rebake loss, confidence weights
 $1/(1 + (\sigma/\tau)^2)$ with zero weight below two views, gradients through the frozen decoder only, output in the
@@ -276,7 +317,8 @@ input's UV layout.
   remain partly in the base color.
 - **Scale ambiguity.** The rebake loss does not fix the base color's overall brightness or tint per channel; the
   generative prior does.
-- **Resolution.** Details smaller than a voxel are lost in the 1024³ grid. Dividing the input texture by the
-  fitted shading at texel resolution would recover them, but is not implemented.
+- **Resolution.** Details smaller than a voxel are lost in the 1024³ grid. Detail recovery (Sec. 8.1) puts the
+  input's texel-level detail back, but along with whatever fine-scale shading the model does not explain (e.g. the
+  baked normal map's detail, which the ground-truth albedo does not contain).
 - **Unobserved voxels.** Decoded voxels without an observation (26% at $s = 4$ on the cauldron) get no guidance
   and are only indirectly affected through the shared latent.

@@ -119,10 +119,10 @@ def supermat_sv_views(input_path, work_dir, supermat, num_views, render_size=512
     views = fibonacci_views(num_views)
     images, depths = render_views(_view_parts(input_path), render_size, views)
     case, pred_dir = work_dir / "supermat_sv_views", work_dir / "supermat_sv_pred"
-    case.mkdir(parents=True, exist_ok=True)
-    for k, im in enumerate(images):
-        Image.fromarray(to_u8(im.cpu().numpy()), "RGBA").save(case / f"color_{k:04d}.png")
-    if supermat is not None:  # None: reuse the predictions already in work_dir
+    if supermat is not None:  # None: only read the predictions already in work_dir (nothing is written)
+        case.mkdir(parents=True, exist_ok=True)
+        for k, im in enumerate(images):
+            Image.fromarray(to_u8(im.cpu().numpy()), "RGBA").save(case / f"color_{k:04d}.png")
         with _InDir(sm_dir):
             for k in range(len(views)):
                 sv.run_one_image(pipe, case / f"color_{k:04d}.png", pred_dir / f"{k:04d}", 512, seed, False,

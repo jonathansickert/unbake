@@ -31,6 +31,7 @@ import nvdiffrast.torch as dr
 from PIL import Image
 
 from unbake.baselines.common import dilate, export_textured_glb, load_parts, normalization, normalize, pbr_material, to_u8
+from unbake.paths import DATA
 from unbake.predictions import PREDICTIONS
 
 # camera positions / up vectors of SuperMat's 6-view example (Z up, Blender camera convention)
@@ -58,8 +59,9 @@ def to_view(points, c2w):
 
 
 @torch.no_grad()
-def render_views(parts_view, size):
-    """RGBA renders of the baked texture and camera-space depth maps for the 6 views."""
+def render_views(parts_view, size, views=VIEWS):
+    """RGBA renders of the baked texture and camera-space depth maps for the given (position, up) views
+    (default: SuperMat's 6 views)."""
     verts, faces, uvs, face_part, off = [], [], [], [], 0
     for k, p in enumerate(parts_view):
         verts.append(p["v"]); uvs.append(p["uv"]); faces.append(p["f"] + off)
@@ -70,7 +72,7 @@ def render_views(parts_view, size):
     face_part = torch.tensor(np.concatenate(face_part), device="cuda")
     ctx = dr.RasterizeCudaContext()
     images, depths = [], []
-    for pos, up in VIEWS:
+    for pos, up in views:
         c2w = c2w_matrix(pos, up)
         x, y, d = to_view(v, c2w)
         clip = torch.stack([x / 0.5, y / 0.5, d - 1.0, torch.ones_like(d)], -1)[None]
@@ -297,7 +299,7 @@ def finalize(path, out_dir, args, t_total):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--input", default="data", help="dataset root")
+    ap.add_argument("--input", default=DATA, help="dataset root")
     ap.add_argument("--pattern", default="*/*_rot*.glb")
     ap.add_argument("--out", default=f"{PREDICTIONS}/supermat")
     ap.add_argument("--sm-dir", required=True, help="clone of https://github.com/hyj542682306/SuperMat")
@@ -331,12 +333,13 @@ def main():
     t0, ok = time.time(), []
     stages = [("project", "mv")] + ([] if args.no_refine else [("bc", "bc"), ("rm", "rm")])
     for stage, net in stages:
-        sm.load(net)
         for i, (name, path, out_dir) in enumerate(todo):
             if (out_dir / "error.txt").exists():
                 continue
             if stage_done(out_dir, stage):
                 continue
+            if sm.stage != net:  # load a network only if some input still needs its stage (resume)
+                sm.load(net)
             try:
                 if stage == "project":
                     stage_project(sm, path, out_dir, args)

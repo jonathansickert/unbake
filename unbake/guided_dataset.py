@@ -1,22 +1,24 @@
 """
-UnBake (basic) on the whole dataset: TRELLIS.2 material stage guided by the SH rebake loss and the 2D
-roughness / metallic prior of SuperMat's single-view network on 16 views (unbake/guided_trellis2.py,
-unbake/prior2d.py), with one prior weight beta. Output per input as the baselines (unbake/predictions.py):
+UnBake on the whole dataset: TRELLIS.2 material stage guided by the SH rebake loss (with visibility, on
+observations sampled at 4x texture density, smooth normals) and the 2D roughness / metallic prior of
+SuperMat's single-view network on 16 views (unbake/guided_trellis2.py, unbake/prior2d.py, Method.md), with
+one prior weight beta. Output per input as the baselines (unbake/predictions.py):
 
     <output>/<item id>__<lighting name>/textured.glb    prediction
                                        /cond.png        conditioning image
-                                       /prior.pt        fused 2D prior per observed voxel (stage 2)
-                                       /supermat_sv_*   renders and per-view SuperMat predictions
+                                       /supermat_sv_*   renders and per-view SuperMat predictions (if SuperMat ran)
                                        /meta.json       settings and losses (written last: marks the input as done)
 
-    python -m unbake.guided_dataset --sm-dir ../SuperMat                    # beta 1, resolution 512
-    python -m unbake.guided_dataset --sm-dir ../SuperMat --beta 0.5 --max-items 2
+    python -m unbake.guided_dataset --sm-dir ../SuperMat         # 1024^3, visibility, 4x observations, beta 1
+    python -m unbake.guided_dataset --reuse-views-from output/predictions/guided_supermat_sv_b1_1024  # no SuperMat run
 
 Stages, so every model is loaded once:
   1. DINOv3 conditioning of every pending input, then DINOv3 is freed.
-  2. SuperMat single-view: 16 renders and predictions per pending input, fused per voxel -> prior.pt; freed.
-  3. TRELLIS.2: per item the shape latent once, then per lighting guided sampling, UV bake, save.
-Finished inputs (meta.json) are skipped, and so are finished priors, so rerunning continues a run.
+  2. SuperMat single-view: 16 renders and predictions per input that has none saved yet; freed.
+  3. TRELLIS.2: per item the shape latent once, then per lighting: observations, prior fused from the saved
+     per-view predictions (in memory, ~3 s), guided sampling, UV bake, save.
+Finished inputs (meta.json) are skipped, so rerunning continues a run. Apart from the predictions only the
+per-view SuperMat outputs are stored (~1 MB per input), and only when SuperMat has to run.
 """
 import os
 
@@ -44,7 +46,7 @@ from unbake.uv_bake import TrellisFrame, merge
 parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
 parser.add_argument("--data", default=DATA, help="dataset root")
 parser.add_argument("--max-items", type=int, default=None, help="only the first N items")
-parser.add_argument("--resolution", type=int, default=512, choices=(512, 1024))
+parser.add_argument("--resolution", type=int, default=1024, choices=(512, 1024))
 parser.add_argument("--seed", type=int, default=42)
 parser.add_argument("--beta", type=float, default=1.0, help="share of the 2D prior's normalized gradient per step")
 parser.add_argument("--views", type=int, default=16, help="SuperMat single-view renders per input")
@@ -54,12 +56,25 @@ parser.add_argument("--lr", type=float, default=0.05)
 parser.add_argument("--huber-delta", type=float, default=0.05)
 parser.add_argument("--lambda-roughness", type=float, default=1.0)
 parser.add_argument("--lambda-metallic", type=float, default=1.0)
-parser.add_argument("--sm-dir", required=True, help="clone of https://github.com/hyj542682306/SuperMat")
+parser.add_argument("--visibility", type=int, default=1, choices=(0, 1), help="visibility in the rebake transfer")
+parser.add_argument("--supersample", type=int, default=4, help="UV rasterization density of the observations")
+parser.add_argument("--normals", default="smooth", choices=("smooth", "face"))
+parser.add_argument("--vis-dirs", type=int, default=256)
+parser.add_argument("--vis-res", type=int, default=2048)
+parser.add_argument("--reuse-views-from", default=None,
+                    help="earlier run (same layout) whose per-input SuperMat predictions are read in place instead of "
+                         "running SuperMat")
+parser.add_argument("--sm-dir", default=None, help="clone of https://github.com/hyj542682306/SuperMat "
+                                                   "(only needed for inputs without saved per-view predictions)")
 parser.add_argument("--sm-ckpt-dir", default="/tmp/supermat", help="folder with supermat.pth (oyiya/SuperMat)")
-parser.add_argument("--output", default=None, help=f"default: {PREDICTIONS}/guided_supermat_sv_b<beta>")
+parser.add_argument("--output", default=None,
+                    help=f"default: {PREDICTIONS}/guided_supermat_sv_b<beta>[_1024][_vis]_ss<s>[_face]")
 args = parser.parse_args()
 res = args.resolution
-output_dir = args.output or f"{PREDICTIONS}/guided_supermat_sv_b{args.beta:g}" + ("" if res == 512 else f"_{res}")
+output_dir = args.output or (f"{PREDICTIONS}/guided_supermat_sv_b{args.beta:g}" + ("" if res == 512 else f"_{res}")
+                              + (f"_vis_ss{args.supersample}" if args.visibility else f"_ss{args.supersample}")
+                              + ("" if args.normals == "smooth" else "_face"))
+obs_kwargs = dict(supersample=args.supersample, normals=args.normals)
 
 dataset = UnbakeDataset(args.data)
 items = [dataset[i] for i in range(len(dataset))[:args.max_items]]
@@ -68,7 +83,8 @@ pending = [(item, [l for l in item.lightings if not os.path.isfile(os.path.join(
            for item in items]
 pending = [(item, lightings) for item, lightings in pending if lightings]
 total = sum(len(l) for _, l in pending)
-print(f"{total} predictions to make ({len(items)} items, resolution {res}, beta {args.beta:g}) -> {output_dir}/")
+print(f"{total} predictions to make ({len(items)} items, resolution {res}, beta {args.beta:g}, visibility "
+      f"{args.visibility}, supersample {args.supersample}, {args.normals} normals) -> {output_dir}/")
 if not total:
     raise SystemExit
 
@@ -96,31 +112,42 @@ pipeline.image_cond_model = None
 gc.collect()
 torch.cuda.empty_cache()
 
-# ---------------------------------------------------------------- 2. 2D prior
-prior_key = lambda lighting: {"input": os.path.abspath(lighting.baked_path), "prior": "supermat_sv", "resolution": res,
-                              "channels": CHANNELS, "views": args.views}
-todo = [(item, l) for item, lightings in pending for l in lightings
-        if not (os.path.isfile(p := os.path.join(out_dir(item, l), "prior.pt"))
-                and torch.load(p)["key"] == prior_key(l))]
-print(f"[2/3] SuperMat single-view prior ({args.views} views) for {len(todo)} inputs")
+# ---------------------------------------------------------------- 2. 2D prior: per-view predictions
+have_views = lambda d: d is not None and all(os.path.isfile(os.path.join(d, "supermat_sv_pred", f"{k:04d}", f"{c}.png"))
+                                             for k in range(args.views) for c in CHANNELS)
+
+
+def view_dir(item, lighting):
+    """Folder with this input's SuperMat per-view predictions, or None."""
+    for d in (out_dir(item, lighting),
+              os.path.join(args.reuse_views_from, input_name(item, lighting)) if args.reuse_views_from else None):
+        if have_views(d):
+            return d
+    return None
+
+
+todo = [(item, l) for item, lightings in pending for l in lightings if view_dir(item, l) is None]
+print(f"[2/3] SuperMat single-view predictions ({args.views} views) for {len(todo)} inputs")
 if todo:
+    assert args.sm_dir, "inputs without saved SuperMat predictions: pass --sm-dir"
     supermat = load_supermat_sv(args.sm_dir, args.sm_ckpt_dir)
     for n, (item, lighting) in enumerate(todo):
         t0 = time.time()
-        glb = lighting.baked()
-        obs = G.voxel_observations(glb, frame_of(glb), res)
-        views, _, depths, preds = supermat_sv_views(lighting.baked_path, out_dir(item, lighting), supermat, args.views,
-                                                    seed=args.seed)
-        value, weight, nviews = fuse(views, depths, preds, obs["centers"], obs["normals"])
-        torch.save({"key": prior_key(lighting), "value": {c: v.cpu() for c, v in value.items()},
-                    "weight": {c: w.cpu() for c, w in weight.items()}, "nviews": nviews.cpu()},
-                   os.path.join(out_dir(item, lighting), "prior.pt"))
-        print(f"  [{n + 1}/{len(todo)}] {item.id[:12]} {lighting.name}: seen in >= 2 views {(nviews >= 2).float().mean():.0%}"
-              f" ({time.time() - t0:.0f} s)", flush=True)
-        del obs, preds, depths
+        supermat_sv_views(lighting.baked_path, out_dir(item, lighting), supermat, args.views, seed=args.seed)
+        print(f"  [{n + 1}/{len(todo)}] {item.id[:12]} {lighting.name} ({time.time() - t0:.0f} s)", flush=True)
     del supermat
     gc.collect()
     torch.cuda.empty_cache()
+
+
+@torch.no_grad()
+def prior_for(item, lighting, obs):
+    """Per-voxel prior fused from the saved per-view predictions (nothing is written)."""
+    views, _, depths, preds = supermat_sv_views(lighting.baked_path, view_dir(item, lighting), None, args.views)
+    value, weight, nviews = fuse(views, depths, preds, obs["centers"], obs["normals"])
+    prior = Prior2D(value, weight, {"roughness": args.lambda_roughness, "metallic": args.lambda_metallic})
+    return prior, float((nviews >= 2).float().mean())
+
 
 # ---------------------------------------------------------------- 3. guided material stage
 print("[3/3] Guided material stage")
@@ -137,10 +164,9 @@ for n, (item, lightings) in enumerate(pending):
     for lighting in lightings:
         t0 = time.time()
         glb = lighting.baked()
-        obs = G.voxel_observations(glb, frame, res)
-        data = torch.load(os.path.join(out_dir(item, lighting), "prior.pt"))
-        prior = Prior2D({c: v.cuda() for c, v in data["value"].items()}, {c: w.cuda() for c, w in data["weight"].items()},
-                        {"roughness": args.lambda_roughness, "metallic": args.lambda_metallic})
+        obs = G.voxel_observations(glb, frame, res, visibility=bool(args.visibility), vis_dirs=args.vis_dirs,
+                                   vis_res=args.vis_res, **obs_kwargs)
+        prior, seen2 = prior_for(item, lighting, obs)
         guide = G.Rebake(obs, res, huber_delta=args.huber_delta, prior=prior, beta=args.beta)
         cond = conds.pop((item.id, lighting.name)).cuda()
         cond = {"cond": cond, "neg_cond": torch.zeros_like(cond)}
@@ -149,13 +175,19 @@ for n, (item, lightings) in enumerate(pending):
         with torch.no_grad():
             pbr = decoder(slat) * 0.5 + 0.5
             _, final = guide(pbr)
+        first_loss, n_obs = (history[0]["rebake"] if history else None), len(obs["keys"])
+        del obs, prior, guide, history  # free the observations / prior before the UV bake (nvdiffrast OOM otherwise)
+        gc.collect()
+        torch.cuda.empty_cache()
         G.write_prediction(lighting.baked_path, frame, pbr, res, os.path.join(out_dir(item, lighting), "textured.glb"))
         meta = {"input": lighting.baked_path, "method": "guided", "prior": "supermat_sv", "views": args.views,
+                "visibility": args.visibility, "supersample": args.supersample, "normals": args.normals,
                 "resolution": res, "seed": args.seed, "beta": args.beta, "guide_t": list(args.guide_t),
                 "iters": args.iters, "lr": args.lr, "huber_delta": args.huber_delta,
                 "lambda": {"roughness": args.lambda_roughness, "metallic": args.lambda_metallic},
                 "view_yaw": YAW_DEG, "view_pitch": PITCH_DEG,
-                "rebake_loss_first": history[0]["rebake"] if history else None, "final": final,
+                "rebake_loss_first": first_loss, "final": final,
+                "prior_seen_2_views": round(seen2, 4), "observed_voxels": n_obs,
                 "time_s": round(time.time() - t0, 1)}
         with open(os.path.join(out_dir(item, lighting), "meta.json"), "w") as f:
             json.dump(meta, f, indent=2)
@@ -165,7 +197,7 @@ for n, (item, lightings) in enumerate(pending):
               + ", ".join(f"{k} {v:.3f}" for k, v in final.items() if k.startswith("l2d_"))
               + f"  ({meta['time_s']} s; {elapsed / 60:.1f} min, ~{elapsed / done * (total - done) / 60:.0f} min left)",
               flush=True)
-        del slat, pbr, obs, prior, guide, cond
+        del slat, pbr, cond
         torch.cuda.empty_cache()
     del shape_slat
     torch.cuda.empty_cache()

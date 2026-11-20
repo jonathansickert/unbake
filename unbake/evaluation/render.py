@@ -3,6 +3,9 @@ Rendering for the relighting evaluation: assets rendered with the TRELLIS.2 PBR 
 HDR environment lighting, with base color / roughness / metallic only (no normal, emissive or
 occlusion maps), so differences come from the estimated channels alone.
 """
+import glob
+import os
+
 import numpy as np
 import OpenEXR
 import torch
@@ -13,11 +16,36 @@ from trellis2.utils.render_utils import yaw_pitch_r_fov_to_extrinsics_intrinsics
 
 from ..gltf_io import Glb
 from ..uv_bake import TrellisFrame
+from ..paths import ENV_MAPS
 from .metrics import material_maps
 
+# Relighting setup of the evaluation
+EVAL_ENV_MAPS = sorted(glob.glob(os.path.join(ENV_MAPS, "eval", "*.exr")))  # none of them is used to create the dataset
+# Every eval env map is scaled to this mean luminance, so a dim map (e.g. a night sky) does not
+# render nearly black and hide material errors. None keeps each map's own brightness.
+ENV_MAP_MEAN_LUMINANCE = 1.0
+NUM_VIEWS = 8
+RESOLUTION = 512
+
+def _smooth_normals(prim, frame: TrellisFrame) -> np.ndarray:
+    """Per-vertex normals in TRELLIS space: the primitive's glTF NORMAL attribute (as the bakes were shaded), or
+    area-weighted face normals if it has none."""
+    if prim.normals is not None:
+        n = prim.normals
+    else:
+        v, f = prim.positions, prim.faces
+        fn = np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]])  # length = 2 x area
+        n = np.zeros_like(v)
+        for k in range(3):
+            np.add.at(n, f[:, k], fn)
+    n = np.stack([n[:, 0], -n[:, 2], n[:, 1]], axis=1)  # the rotation of TrellisFrame (uniform scale drops out)
+    return (n / np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)).astype(np.float32)
+
+
 def render_mesh(glb: Glb, frame: TrellisFrame, constants: dict[str, float] | None = None,
-                device="cuda") -> MeshWithPbrMaterial:
-    """GLB -> MeshWithPbrMaterial (base color / roughness / metallic) in TRELLIS space."""
+                device="cuda", smooth_normals: bool = True) -> MeshWithPbrMaterial:
+    """GLB -> MeshWithPbrMaterial (base color / roughness / metallic) in TRELLIS space. With smooth_normals (default)
+    the renderer shades with the interpolated vertex normals of the GLB instead of flat face normals."""
     prims = glb.world_primitives()
     materials = []
     for mi in range(len(glb.json.get("materials", []))):
@@ -41,13 +69,16 @@ def render_mesh(glb: Glb, frame: TrellisFrame, constants: dict[str, float] | Non
         uv_coords.append(p.uvs[p.faces] if p.uvs is not None else np.zeros((len(p.faces), 3, 2)))
         offset += len(p.positions)
     t = lambda a, dt: torch.from_numpy(np.concatenate(a)).to(device=device, dtype=dt)
-    return MeshWithPbrMaterial(
+    mesh = MeshWithPbrMaterial(
         vertices=t(vertices, torch.float32),
         faces=t(faces, torch.int32),
         material_ids=t(material_ids, torch.long),
         uv_coords=t(uv_coords, torch.float32),
         materials=materials,
     )
+    if smooth_normals:
+        mesh.vertex_normals = t([_smooth_normals(p, frame) for p in prims], torch.float32)
+    return mesh
 
 
 def load_envmap(path: str, mean_luminance: float | None = None, device="cuda") -> EnvMap:

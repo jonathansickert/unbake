@@ -36,6 +36,7 @@ import numpy as np
 from PIL import Image
 
 from unbake.baselines.common import export_textured_glb, load_parts, pbr_material, to_u8, uv_coverage
+from unbake.paths import DATA
 from unbake.predictions import PREDICTIONS
 
 MA_ARGS = ["--add_view_to_prompt", "--ddim_steps", "50", "--new_strength", "1", "--update_strength", "0.5",
@@ -141,13 +142,13 @@ def run_asset(path, out_dir, args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--input", default="data", help="an asset file, or a directory searched with --pattern")
+    ap.add_argument("--input", default=DATA, help="an asset file, or a directory searched with --pattern")
     ap.add_argument("--pattern", default="*/*_rot*.glb")
     ap.add_argument("--out", default=f"{PREDICTIONS}/material_anything")
     ap.add_argument("--ma-dir", required=True, help="clone of https://github.com/3DTopia/MaterialAnything, patched")
     ap.add_argument("--ma-python", required=True, help="python of the Material Anything environment")
     ap.add_argument("--work-dir", default="/tmp/material_anything_work", help="MA's intermediate renders (large)")
-    ap.add_argument("--prompt", default="{name}", help="text prompt for MA, {name} = file name without _baked")
+    ap.add_argument("--prompt", default="an object", help="text prompt for MA ({name} = input file name; the dataset's names are lighting names, so neutral by default)")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--texture-size", type=int, default=1024, help="size of each atlas inside MA's texture")
     ap.add_argument("--keep-work", action="store_true")

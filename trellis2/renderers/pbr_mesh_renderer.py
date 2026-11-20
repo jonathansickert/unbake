@@ -307,10 +307,18 @@ class PbrMeshRenderer:
                 # Depth
                 gb_depth = dr.interpolate(vertices_camera[..., 2:3].contiguous(), rast, faces)[0][0]
                         
-                # Normal
-                gb_normal = dr.interpolate(face_normal.unsqueeze(0), rast, torch.arange(face_normal.shape[0], dtype=torch.int, device=self.device).unsqueeze(1).repeat(1, 3).contiguous())[0][0]
+                # Normal (flat face normals, or interpolated smooth vertex normals if the mesh has `vertex_normals`);
+                # flipped towards the camera by the face normal's side (double-sided shading)
+                gb_face_normal = dr.interpolate(face_normal.unsqueeze(0), rast, torch.arange(face_normal.shape[0], dtype=torch.int, device=self.device).unsqueeze(1).repeat(1, 3).contiguous())[0][0]
+                vertex_normals = getattr(mesh, "vertex_normals", None)
+                if vertex_normals is not None and transformation is None:
+                    gb_normal = F.normalize(dr.interpolate(vertex_normals.unsqueeze(0).contiguous(), rast, faces)[0][0], dim=-1)
+                    # keep the smooth normal on the face normal's side of the surface
+                    gb_normal = torch.where(torch.sum(gb_normal * gb_face_normal, dim=-1, keepdim=True) < 0, -gb_normal, gb_normal)
+                else:
+                    gb_normal = gb_face_normal
                 gb_normal = torch.where(
-                    torch.sum(gb_normal * (pos - rays_o), dim=-1, keepdim=True) > 0,
+                    torch.sum(gb_face_normal * (pos - rays_o), dim=-1, keepdim=True) > 0,
                     -gb_normal,
                     gb_normal
                 )

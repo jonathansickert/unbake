@@ -9,8 +9,9 @@ import os
 from pathlib import Path
 
 from .dataset import DatasetItem, Lighting
+from .paths import OUTPUT
 
-PREDICTIONS = "output/predictions"
+PREDICTIONS = os.path.join(OUTPUT, "predictions")
 PREDICTION_FILE = "textured.glb"
 
 # Baseline: baked texture as base color, with fixed roughness/metallic. Files store no reliable
@@ -25,6 +26,14 @@ METHOD_NAMES = {
     "supermat": "SuperMat",
     "material_anything": "Material Anything",
     "rgbx": "RGB<->X",
+    "guided_supermat_sv_b1": "UnBake basic (rebake + SuperMat 16v, beta 1)",
+    "guided_supermat_sv_b1_1024": "UnBake basic 1024 (rebake + SuperMat 16v, beta 1)",
+    "guided_supermat_sv_b1_1024_vis_ss4": "UnBake 1024 (rebake + visibility + SuperMat 16v, beta 1)",
+    "guided_supermat_sv_b1_1024_vis_ss4_detail": "UnBake 1024 + detail recovery",
+    "trellis1024_bc+supermat_rm": "Hybrid (TRELLIS.2 base color + SuperMat r/m)",
+    "hybrid_detail": "Hybrid + detail recovery",
+    "guided+sm16_rm": "UnBake base color + fused SuperMat 16v r/m",
+    "guided_detail+sm16_rm": "UnBake base color + detail + fused SuperMat 16v r/m",
 }
 
 
@@ -41,3 +50,13 @@ def methods(predictions: str) -> dict:
             lambda item, lighting, folder=folder:
             (os.path.join(predictions, folder, input_name(item, lighting), PREDICTION_FILE), None))
     return out
+
+
+def first_complete_lighting(item: DatasetItem, methods: dict) -> Lighting:
+    """The item's first lighting condition for which every method has a prediction (methods: as
+    returned by methods()). With complete methods this is simply the first lighting condition, so
+    figures don't pick examples in anyone's favour."""
+    for lighting in item.lightings:
+        if all(os.path.isfile(locate(item, lighting)[0]) for locate in methods.values()):
+            return lighting
+    raise ValueError(f"item {item.id}: no lighting condition has predictions of every method")

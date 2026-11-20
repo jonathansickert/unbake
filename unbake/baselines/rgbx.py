@@ -9,8 +9,10 @@ view direction). Besides the fused maps it writes the per-texel spread across vi
 RGB->X is trained on interior scenes; this is the go/no-go test for using it as 2D material prior on
 objects. Output format as unguided_trellis2.py, so evaluate_uv.py / evaluate_relit.py apply.
 
-    python -m unbake.baselines.rgbx --out output/predictions/rgbx \
-        --rgbx-dir path/to/rgbx
+    python -m unbake.baselines.rgbx --weights /tmp/rgb-to-x
+
+The RGB<->X code is the rgbx/ submodule (git submodule update --init rgbx); --weights is a local
+download of zheng95z/rgb-to-x or the Hub id itself.
 
 Code and weights (zheng95z/rgbx, zheng95z/rgb-to-x) are under the Adobe Research License (noncommercial
 research only).
@@ -30,16 +32,17 @@ from PIL import Image
 
 from unbake.baselines.common import export_textured_glb, load_parts, normalization, normalize, pbr_material, to_u8
 from unbake.baselines.supermat import VIEWS, EXTENT, render_views, texel_samples, back_project
+from unbake.paths import DATA, repo_path
 from unbake.predictions import PREDICTIONS
 
 PROMPTS = {"albedo": "Albedo (diffuse basecolor)", "roughness": "Roughness", "metallic": "Metallicness"}
 
 
-def load_rgbx(rgbx_dir):
+def load_rgbx(rgbx_dir, weights):
     sys.path.insert(0, str(Path(rgbx_dir) / "rgb2x"))
     from diffusers import DDIMScheduler
     from pipeline_rgb2x import StableDiffusionAOVMatEstPipeline
-    pipe = StableDiffusionAOVMatEstPipeline.from_pretrained("zheng95z/rgb-to-x", torch_dtype=torch.float16).to("cuda")
+    pipe = StableDiffusionAOVMatEstPipeline.from_pretrained(weights, torch_dtype=torch.float16).to("cuda")
     pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config, rescale_betas_zero_snr=True,
                                                timestep_spacing="trailing")
     pipe.set_progress_bar_config(disable=True)
@@ -130,10 +133,11 @@ def run_asset(pipe, path, out_dir, args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--input", default="data", help="dataset root")
+    ap.add_argument("--input", default=DATA, help="dataset root")
     ap.add_argument("--pattern", default="*/*_rot*.glb")
     ap.add_argument("--out", default=f"{PREDICTIONS}/rgbx")
-    ap.add_argument("--rgbx-dir", required=True, help="clone of https://github.com/zheng95z/rgbx")
+    ap.add_argument("--rgbx-dir", default=repo_path("rgbx"), help="clone of https://github.com/zheng95z/rgbx")
+    ap.add_argument("--weights", default="zheng95z/rgb-to-x", help="local copy of the weights or Hub id")
     ap.add_argument("--only", default=None, help="comma-separated object id prefixes")
     ap.add_argument("--render-size", type=int, default=1024)
     ap.add_argument("--size", type=int, default=512, help="RGB->X resolution")
@@ -150,7 +154,7 @@ def main():
     assets = sorted(inp.glob(args.pattern))
     if args.only:
         assets = [p for p in assets if any(p.parent.name.startswith(o) for o in args.only.split(","))]
-    pipe = load_rgbx(args.rgbx_dir)
+    pipe = load_rgbx(args.rgbx_dir, args.weights)
     for path in assets:
         name = str(path.relative_to(inp).with_suffix("")).replace(os.sep, "__")
         out_dir = out_root / name

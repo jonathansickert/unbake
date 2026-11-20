@@ -3,16 +3,18 @@ Shared by the evaluation scripts: command-line arguments, and summaries / printe
 per-record metrics (one record per item x lighting x method).
 """
 import math
+import os
 
 import numpy as np
 
 from ..dataset import UnbakeDataset
+from ..paths import DATA, OUTPUT
 from ..predictions import PREDICTIONS, methods
 from .metrics import CHANNELS
 
 
-def add_eval_args(parser, output="output/eval"):
-    parser.add_argument("--data", default="data", help="dataset root")
+def add_eval_args(parser, output=os.path.join(OUTPUT, "eval")):
+    parser.add_argument("--data", default=DATA, help="dataset root")
     parser.add_argument("--predictions", default=PREDICTIONS, help="folder with one subfolder per method")
     parser.add_argument("--max-items", type=int, default=None, help="evaluate only the first N items")
     parser.add_argument("--output", default=output, help="output directory")

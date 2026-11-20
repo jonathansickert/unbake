@@ -29,6 +29,7 @@ class Primitive:
     positions: np.ndarray  # (V, 3) float64, world space (glTF Y-up)
     uvs: np.ndarray | None  # (V, 2) float32, glTF convention (origin top-left)
     faces: np.ndarray  # (F, 3) int64
+    normals: np.ndarray | None = None  # (V, 3) float64, unit, world space (glTF NORMAL), if present
 
 
 class Glb:
@@ -98,8 +99,12 @@ class Glb:
                     if np.linalg.det(world[:3, :3]) < 0:  # mirrored transform flips winding
                         faces = faces[:, ::-1].copy()
                     uv = prim["attributes"].get("TEXCOORD_0")
+                    nrm = prim["attributes"].get("NORMAL")
+                    if nrm is not None:  # normals transform with the inverse transpose
+                        nrm = self.accessor(nrm).astype(np.float64) @ np.linalg.inv(world[:3, :3])
+                        nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-12)
                     out.append(Primitive(node["mesh"], pi, prim.get("material"), pos,
-                                         None if uv is None else self.accessor(uv).astype(np.float32), faces))
+                                         None if uv is None else self.accessor(uv).astype(np.float32), faces, nrm))
             for child in node.get("children", []):
                 visit(child, world)
 
